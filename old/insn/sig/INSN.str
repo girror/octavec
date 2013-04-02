@@ -1,0 +1,32 @@
+module INSN
+imports Insn-Whitespace Insn-Comment Insn-Operators Insn-Lexicals Insn-Literals Insn-Types
+signature
+  constructors
+    PROGRAM          : List(IFunc) -> IProgram
+    FUNCTION         : List(ILoc) * List(IStmt) * List(ILoc) -> IFunc
+    ENTER_FUNC       : IStmt
+    LEAVE_FUNC       : IStmt
+    LOC              : Id * IType -> ILoc
+    LABEL            : Id -> IStmt
+    CONST            : ILoc * IntConst -> IStmt
+    LABELREF         : ILoc * Id -> IStmt
+    DATA             : IOp * List(ILoc) * List(Iloc) -> IStmt
+    LOAD             : ILoc * ILoc -> IStmt
+    STORE            : ILoc * ILoc -> IStmt
+    BRANCH           : IComp * Option(ILoc) * ILloc * Option(ILoc) -> IStmt
+    CALL             : IComp * Option(ILoc) * Loc -> IStmt
+    NOTE_LOC_BIRTH   : ILoc -> IStmt
+    NOTE_LOC_DEATH   : ILoc -> IStmt
+    NOTE_LOOP_START  : Id -> IStmt
+    NOTE_LOOP_FINISH : Id -> IStmt
+    IN_ARG           : ILoc * IntConst -> IStmt
+    IN_RET           : IntConst * ILoc -> IStmt
+    OUT_ARG          : IntConst * ILoc -> IStmt
+    OUT_RET          : ILoc * IntConst -> IStmt
+    ALLOC_FRAME      : IntConst * IntConst -> IStmt
+    FREE_FRAME       : IntConst * IntConst -> IStmt
+    ALLOC_STATIC     : Loc * IntConst -> IStmt
+    FREE_STATIC      : Loc * IntConst -> IStmt
+    ALLOC_STRING     : Id * StrConst -> IFunc
+    SEQS             : List(IStmt) -> IStmt
+    SEQ              : IStmt * IStmt -> IStmt
