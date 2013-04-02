@@ -1,0 +1,685 @@
+---------------------- How to load data from ascii file ---------------
+ 
+error: load: couldn't open input file `MathLec.txt'
+error: evaluating assignment expression near line 38, column 5
+---------------------- How to load data from ascii file ---------------
+ 
+error: load: nonexistent file `MathLec.txt'
+error: load: nonexistent file: `MathLec.txt'
+error: evaluating assignment expression near line 38, column 5
+---------------------- How to load data from ascii file ---------------
+ 
+--------------------- create matrix, some math, OLS -------------------
+ 
+ 
+Q
+1
+ 
+q
+  1  2  3
+  4  5  6
+ 
+q2
+  1  5
+  4  3
+  2  6
+ 
+p
+   1
+  11
+  21
+ 
+z
+   1   2   3
+   4   5   6
+   1  11  21
+ 
+z3a=z^3
+    270   1107   1944
+    594   2403   4212
+   1728   7182  12636
+ 
+z3b=z.^3
+     1     8    27
+    64   125   216
+     1  1331  9261
+ 
+q
+  1  2  3
+  4  5  6
+ 
+w
+  10  11  12
+  13  14  15
+ 
+y1=q + w
+  11  13  15
+  17  19  21
+ 
+y2=q.*w
+  10  22  36
+  52  70  90
+ 
+OLS coefficients
+  0.91598
+  0.89766
+ 
+R2
+0.99822
+ 
+lnC(1) or r(1) contains a missing value
+ 
+Mean and Std of random draws from N(0,1): 
+  -0.0026612   0.0180473  -0.0297283
+  0.98587  1.02492  0.96841
+---------------------- Writing a loop ---------------------------------
+ 
+1
+3
+6
+10
+15
+21
+28
+36
+45
+55
+-------------------- Writing nested loops -----------------------------
+ 
+Calculate vech(x) of square matrix x
+ 
+Original matrix: 
+  1  4  7
+  2  5  8
+  3  6  9
+ 
+vech of the matrix: 
+  1
+  2
+  3
+  5
+  6
+  9
+---------------------- Functions --------------------------------------
+ 
+x before proc: 
+1
+ 
+x from proc: 
+6
+---------------------- Graphs -----------------------------------------
+ 
+ 
+Program is paused. Take a look at the figure, perhaps print, then hit any key
+---------------------- Extra: optimization ----------------------------
+ 
+Octave has no built-in optimization routine, see http://octave.sourceforge.net/
+------------------ More advanced graphs -------------------------------
+ 
+---------------------- cleaning up after program ----------------------
+ 
+---------------------- How to load data from ascii file ---------------
+ 
+--------------------- create matrix, some math, OLS -------------------
+ 
+ 
+Q
+1
+ 
+q
+  1  2  3
+  4  5  6
+ 
+q2
+  1  5
+  4  3
+  2  6
+ 
+p
+   1
+  11
+  21
+ 
+z
+   1   2   3
+   4   5   6
+   1  11  21
+ 
+z3a=z^3
+    270   1107   1944
+    594   2403   4212
+   1728   7182  12636
+ 
+z3b=z.^3
+     1     8    27
+    64   125   216
+     1  1331  9261
+ 
+q
+  1  2  3
+  4  5  6
+ 
+w
+  10  11  12
+  13  14  15
+ 
+y1=q + w
+  11  13  15
+  17  19  21
+ 
+y2=q.*w
+  10  22  36
+  52  70  90
+ 
+OLS coefficients
+  0.91598
+  0.89766
+ 
+R2
+0.99822
+ 
+lnC(1) or r(1) contains a missing value
+ 
+Mean and Std of random draws from N(0,1): 
+  0.023865  0.045220  0.424078
+  0.97829  0.97958  0.96309
+---------------------- Writing a loop ---------------------------------
+ 
+1
+3
+6
+10
+15
+21
+28
+36
+45
+55
+-------------------- Writing nested loops -----------------------------
+ 
+Calculate vech(x) of square matrix x
+ 
+Original matrix: 
+  1  4  7
+  2  5  8
+  3  6  9
+ 
+vech of the matrix: 
+  1
+  2
+  3
+  5
+  6
+  9
+---------------------- Functions --------------------------------------
+ 
+x before proc: 
+1
+ 
+x from proc: 
+6
+---------------------- Graphs -----------------------------------------
+ 
+ 
+Program is paused. Take a look at the figure, perhaps print, then hit any key
+ 
+Program is paused. Take a look at the figure, perhaps print, then hit any key
+---------------------- Extra: optimization ----------------------------
+ 
+Octave has no built-in optimization routine, see http://octave.sourceforge.net/
+------------------ More advanced graphs -------------------------------
+ 
+---------------------- cleaning up after program ----------------------
+ 
+---------------------- How to load data from ascii file ---------------
+ 
+--------------------- create matrix, some math, OLS -------------------
+ 
+ 
+Q
+1
+ 
+q
+  1  2  3
+  4  5  6
+ 
+q2
+  1  5
+  4  3
+  2  6
+ 
+p
+   1
+  11
+  21
+ 
+z
+   1   2   3
+   4   5   6
+   1  11  21
+ 
+z3a=z^3
+    270   1107   1944
+    594   2403   4212
+   1728   7182  12636
+ 
+z3b=z.^3
+     1     8    27
+    64   125   216
+     1  1331  9261
+ 
+q
+  1  2  3
+  4  5  6
+ 
+w
+  10  11  12
+  13  14  15
+ 
+y1=q + w
+  11  13  15
+  17  19  21
+ 
+y2=q.*w
+  10  22  36
+  52  70  90
+ 
+OLS coefficients
+  0.91598
+  0.89766
+ 
+R2
+0.99822
+ 
+lnC(1) or r(1) contains a missing value
+ 
+Mean and Std of random draws from N(0,1): 
+   0.1043203  -0.0036779   0.0055683
+  0.84807  0.92556  0.99571
+---------------------- Writing a loop ---------------------------------
+ 
+1
+3
+6
+10
+15
+21
+28
+36
+45
+55
+-------------------- Writing nested loops -----------------------------
+ 
+Calculate vech(x) of square matrix x
+ 
+Original matrix: 
+  1  4  7
+  2  5  8
+  3  6  9
+ 
+vech of the matrix: 
+  1
+  2
+  3
+  5
+  6
+  9
+---------------------- Functions --------------------------------------
+ 
+x before proc: 
+1
+ 
+x from proc: 
+6
+---------------------- Graphs -----------------------------------------
+ 
+ 
+Program is paused. Take a look at the figure, perhaps print, then hit any key
+ 
+Program is paused. Take a look at the figure, perhaps print, then hit any key
+---------------------- Extra: optimization ----------------------------
+ 
+Octave has no built-in optimization routine, see http://octave.sourceforge.net/
+------------------ More advanced graphs -------------------------------
+ 
+---------------------- cleaning up after program ----------------------
+ 
+---------------------- How to load data from ascii file ---------------
+ 
+--------------------- create matrix, some math, OLS -------------------
+ 
+ 
+Q
+1
+ 
+q
+  1  2  3
+  4  5  6
+ 
+q2
+  1  5
+  4  3
+  2  6
+ 
+p
+   1
+  11
+  21
+ 
+z
+   1   2   3
+   4   5   6
+   1  11  21
+ 
+z3a=z^3
+    270   1107   1944
+    594   2403   4212
+   1728   7182  12636
+ 
+z3b=z.^3
+     1     8    27
+    64   125   216
+     1  1331  9261
+ 
+q
+  1  2  3
+  4  5  6
+ 
+w
+  10  11  12
+  13  14  15
+ 
+y1=q + w
+  11  13  15
+  17  19  21
+ 
+y2=q.*w
+  10  22  36
+  52  70  90
+ 
+OLS coefficients
+  0.91598
+  0.89766
+ 
+R2
+0.99822
+ 
+lnC(1) or r(1) contains a missing value
+ 
+Mean and Std of random draws from N(0,1): 
+  -0.010974   0.078742   0.124271
+  0.99108  0.95324  0.95540
+---------------------- Writing a loop ---------------------------------
+ 
+1
+3
+6
+10
+15
+21
+28
+36
+45
+55
+-------------------- Writing nested loops -----------------------------
+ 
+Calculate vech(x) of square matrix x
+ 
+Original matrix: 
+  1  4  7
+  2  5  8
+  3  6  9
+ 
+vech of the matrix: 
+  1
+  2
+  3
+  5
+  6
+  9
+---------------------- Functions --------------------------------------
+ 
+x before proc: 
+1
+ 
+x from proc: 
+6
+---------------------- Graphs -----------------------------------------
+ 
+ 
+Program is paused. Take a look at the figure, perhaps print, then hit any key
+ 
+Program is paused. Take a look at the figure, perhaps print, then hit any key
+---------------------- Extra: optimization ----------------------------
+ 
+Octave has no built-in optimization routine, see http://octave.sourceforge.net/
+------------------ More advanced graphs -------------------------------
+ 
+---------------------- cleaning up after program ----------------------
+ 
+---------------------- How to load data from ascii file ---------------
+ 
+--------------------- create matrix, some math, OLS -------------------
+ 
+ 
+Q
+1
+ 
+q
+  1  2  3
+  4  5  6
+ 
+q2
+  1  5
+  4  3
+  2  6
+ 
+p
+   1
+  11
+  21
+ 
+z
+   1   2   3
+   4   5   6
+   1  11  21
+ 
+z3a=z^3
+    270   1107   1944
+    594   2403   4212
+   1728   7182  12636
+ 
+z3b=z.^3
+     1     8    27
+    64   125   216
+     1  1331  9261
+ 
+q
+  1  2  3
+  4  5  6
+ 
+w
+  10  11  12
+  13  14  15
+ 
+y1=q + w
+  11  13  15
+  17  19  21
+ 
+y2=q.*w
+  10  22  36
+  52  70  90
+ 
+OLS coefficients
+  0.91598
+  0.89766
+ 
+R2
+0.99822
+ 
+lnC(1) or r(1) contains a missing value
+ 
+Mean and Std of random draws from N(0,1): 
+  0.082411  0.045881  0.058135
+  0.90808  0.97190  1.00229
+---------------------- Writing a loop ---------------------------------
+ 
+1
+3
+6
+10
+15
+21
+28
+36
+45
+55
+-------------------- Writing nested loops -----------------------------
+ 
+Calculate vech(x) of square matrix x
+ 
+Original matrix: 
+  1  4  7
+  2  5  8
+  3  6  9
+ 
+vech of the matrix: 
+  1
+  2
+  3
+  5
+  6
+  9
+---------------------- Functions --------------------------------------
+ 
+x before proc: 
+1
+ 
+x from proc: 
+6
+---------------------- Graphs -----------------------------------------
+ 
+ 
+Program is paused. Take a look at the figure, perhaps print, then hit any key
+ 
+Program is paused. Take a look at the figure, perhaps print, then hit any key
+---------------------- Extra: optimization ----------------------------
+ 
+Octave has no built-in optimization routine, see http://octave.sourceforge.net/
+------------------ More advanced graphs -------------------------------
+ 
+---------------------- cleaning up after program ----------------------
+ 
+---------------------- How to load data from ascii file ---------------
+ 
+--------------------- create matrix, some math, OLS -------------------
+ 
+ 
+Q
+1
+ 
+q
+  1  2  3
+  4  5  6
+ 
+q2
+  1  5
+  4  3
+  2  6
+ 
+p
+   1
+  11
+  21
+ 
+z
+   1   2   3
+   4   5   6
+   1  11  21
+ 
+z3a=z^3
+    270   1107   1944
+    594   2403   4212
+   1728   7182  12636
+ 
+z3b=z.^3
+     1     8    27
+    64   125   216
+     1  1331  9261
+ 
+q
+  1  2  3
+  4  5  6
+ 
+w
+  10  11  12
+  13  14  15
+ 
+y1=q + w
+  11  13  15
+  17  19  21
+ 
+y2=q.*w
+  10  22  36
+  52  70  90
+ 
+OLS coefficients
+  0.91598
+  0.89766
+ 
+R2
+0.99822
+ 
+lnC(1) or r(1) contains a missing value
+ 
+Mean and Std of random draws from N(0,1): 
+  -0.112647  -0.060208   0.159210
+  1.04545  1.02064  0.94648
+---------------------- Writing a loop ---------------------------------
+ 
+1
+3
+6
+10
+15
+21
+28
+36
+45
+55
+-------------------- Writing nested loops -----------------------------
+ 
+Calculate vech(x) of square matrix x
+ 
+Original matrix: 
+  1  4  7
+  2  5  8
+  3  6  9
+ 
+vech of the matrix: 
+  1
+  2
+  3
+  5
+  6
+  9
+---------------------- Functions --------------------------------------
+ 
+x before proc: 
+1
+ 
+x from proc: 
+6
+---------------------- Graphs -----------------------------------------
+ 
+ 
+Program is paused. Take a look at the figure, perhaps print, then hit any key
+ 
+Program is paused. Take a look at the figure, perhaps print, then hit any key
+---------------------- Extra: optimization ----------------------------
+ 
+Octave has no built-in optimization routine, see http://octave.sourceforge.net/
+------------------ More advanced graphs -------------------------------
+ 
+---------------------- cleaning up after program ----------------------
+ 

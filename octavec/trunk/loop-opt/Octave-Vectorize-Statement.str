@@ -1,0 +1,73 @@
+module Octave-Vectorize-Statement 
+imports 
+  liblib 
+  liboctavec
+  Octave-MIV
+strategies
+  
+  vectorize-stat(|iv) =
+    ? (stat,uid)
+    ; <oncetd(vectorize-statement(|iv,uid))>stat
+
+  vectorize-statement(|iv,uid) :
+    |[ x[a1*] = e ]| -> |[ x[a2*] = e2 ]|
+    where log(|Debug(),"Vectorizing statement",<id>)
+        ; <number(id)> a1* 
+        ; filter(only-contains-var(|iv)) => [(sub,index)]
+        ; <rewrite-sub(|iv)>sub
+        ; <set-index>(index,<id>,a1*) => a2*
+	; <topdown(try(vectorize-rhs(|iv,index)))> e 
+	; if <HasMultipleMatrices> uid
+	  then innermost(change-binop)
+	  end 
+	  => e2
+        ; log(|Debug(),"Vectorized statement", |[ x[a2*] = e2 ]|)
+	  
+
+  vectorize-rhs(|iv,index) :
+    |[ x[a1*] ]| -> |[ x[a2*] ]|
+    where <index>(<inc>index,a1*)
+        ; only-contains-var(|iv)
+        ; rewrite-sub(|iv)
+        ; <set-index>(index,<id>,a1*) => a2*
+
+  rewrite-sub(|iv) :
+    e1 -> e2
+    where <get-coefficient(|iv)> e1 => coefficient 
+	; <UpperBound> iv => ub 
+	; <get-int-val(|iv)> e1 
+	; <calculate-range> (coefficient, <id>, ub) => e2 
+
+  get-coefficient(|x) :
+    e -> i
+    where <oncetd( (?|[ j * x ]|; <string-to-int> j => i) 
+                <+ (?|[ x ]|; !1 => i) )> e 
+
+  calculate-range :
+    (j, j2, e) -> |[ (i:j3:e1) ]|
+    where
+      <int-to-string> j => j3 
+    ; <int-to-string> j2 => j4 
+    ; if <is-int>e then 
+        !Int(<int-to-string>e) 
+      end => e2 // XXX quick fix for the annoying fact that int's and octave ast is mixed
+    ; !|[ (j3 * e2) + j4 ]|
+    ; innermost(de-norm) => e1
+    ; <add>(j,j2) 
+    ; int-to-string => i 
+
+  get-int-val(|iv) =
+     oncetd(? |[ (e + i) ]|)   
+   ; <try(string-to-int)>i
+  <+ !0
+	    
+  change-binop :
+    |[ e * e1 ]| -> |[ e .* e1 ]|
+    where <contains(? |[ x[a1*] ]|)> e
+        ; <contains(? |[ y[a2*] ]|)> e1
+
+  change-binop :
+    |[ e / e1 ]| -> |[ e ./ e1 ]|
+    where <contains(? |[ x[a1*] ]|)> e
+        ; <contains(? |[ y[a2*] ]|)> e1
+

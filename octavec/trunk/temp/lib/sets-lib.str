@@ -1,0 +1,18 @@
+module sets-lib
+strategies
+
+
+ /**
+  * @type  List(List(a)) -> List(a)
+  * keeps duplicated elements
+  */
+ unions-set = foldr(![], conc)
+
+
+ collect-split-set(splitter) =
+    rec x(CollectSplitSet(x, splitter <+ !(<id>,[])))
+
+ CollectSplitSet(s, splitter) :
+    c#(as){annos*} -> (t, <conc> (ys, <unions-set> xs))
+      where <unzip(s)> as => (bs, xs);
+      <splitter> c#(bs){annos*} => (t, ys)

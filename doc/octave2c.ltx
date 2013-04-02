@@ -1,0 +1,115 @@
+%------------------------------------------------------------------%
+
+\section{Octave to C++ translation}
+
+
+%------------------------------------------------------------------%
+
+\subsection{Global structure}
+
+
+
+%------------------------------------------------------------------%
+
+\subsection{Data types}
+
+\subsubsection{Integer}
+
+\subsubsection{Real}
+
+\subsubsection{String}
+
+\subsubsection{N-dimensional array of reals}
+
+\subsubsection{Range}
+
+\subsubsection{Structure}
+
+\subsubsection{Cell array}
+
+
+%------------------------------------------------------------------%
+
+\subsection{Operators}
+
+
+%------------------------------------------------------------------%
+
+\subsection{Single assignments}
+
+
+%------------------------------------------------------------------%
+
+\subsection{Control flow translation}
+
+\subsubsection{Conversion of datatype to bool}
+
+\subsubsection{If-then-else}
+
+The if-then-else statements in Octave and C only differ
+syntactically. Therefore the translation is very straightforward.
+
+\begin{verbatim}
+
+\end{verbatim}
+
+
+\subsubsection{While}
+
+Just like the if-then-else statement, the while statement only needs a
+syntactical translation. 
+
+\subsubsection{For}
+
+Unlike the previous control flow statements, the for statement needs a
+semantical translation. In Octave it is possible to loop over the
+following structures.
+
+\begin{itemize}
+  \item N-dimensional arrays
+  \item Ranges
+  \item Structures
+\end{itemize}
+
+  * Loop over known range ( for x = 1:5 ... end )
+
+  * Loop over unknown range ( for x = 1:a ... end )
+
+  * Loop over structure ( for [val, key] = x ... end, where x is a
+    structure, key may be omitted)
+
+  * Loop over N-dimensional array
+
+
+\subsubsection{Continue statement}
+
+\subsubsection{Break statement}
+
+
+%------------------------------------------------------------------%
+
+\subsection{Function}
+
+\subsubsection{Single return value}
+
+\subsubsection{Multiple return values}
+
+\subsubsection{Return statement}
+
+
+%------------------------------------------------------------------%
+
+\subsection{Multiple assignments}
+
+
+%------------------------------------------------------------------%
+
+\subsection{Exception handling}
+
+\subsubsection{Unwind-protect}
+
+\subsubsection{Try-catch}
+
+
+%------------------------------------------------------------------%
+

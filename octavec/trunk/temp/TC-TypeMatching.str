@@ -1,0 +1,154 @@
+module TC-TypeMatching
+
+strategies
+
+ /**
+  * instantiate wildcards to actuall shapes
+  * (call-types,specified-types)
+  */
+ get-tailored-typeshape =
+      ?(call-types, call-spec)
+    ; <length>call-types => num 
+    ; <last;(?MANY(<id>) + ?ONE_MANY(<id>)) > call-spec =>typeshape
+    ; <upto>num; Tl ; map(!typeshape)
+    ; <conc; take(!num)>(<init>call-spec,<id>)
+    ; !(call-types,<id>)
+   
+ customize-repetition-type =
+      get-arguments-call
+    ; try(get-tailored-typeshape)
+
+
+
+  
+ /**
+  * Type matching
+  * (call-types,specified-types)
+  */
+  get-arguments-call =
+   where( 
+	  ?(call-types,specified-types)
+	; (length,length)
+	; ?(a, _)
+        ; if geq then !(call-types,specified-types)
+	  else <take(!a)> specified-types; !(call-types,<id>) end
+
+    )
+
+
+  check-arguments-call =
+      get-arguments-call
+    ; try(get-tailored-typeshape)
+    ; check-strict-arguments-call1(CheckArgsNotStrict)
+
+
+  check-strict-arguments-call(strict) =
+    (?([],[]) <+ check-strict-arguments-call1(strict))
+
+
+ /**
+  * Type matching
+  * (call-types,specified-types)
+  */
+  check-strict-arguments-call1(strict) =
+   where(
+       zip(id)
+    ; !(<init>,<last>)
+    ; (map(eq <+ CheckArgs), eq <+ CheckArgs <+ strict)
+    )
+
+
+
+  CheckArgs:
+   (_, UNIVERSAL) -> []
+
+
+  CheckArgs:
+  (ts, SCALAR(|[ scalar ]|)) -> []
+   where <get-scalar>ts; not(?|[char]|)
+ 
+  CheckArgs:
+   (SCALAR(t),|[matrix(t1,dim(1,1))]|) -> []
+
+  CheckArgs:
+   (|[matrix(t,dim(1,1))]|,SCALAR(t)) -> []
+
+  CheckArgs:
+   (|[matrix(char,dim(sh*))]|,|[matrix(char,dim(sh2*))]|) -> []
+
+
+  CheckArgs: 
+   (SCALAR(t),|[matrix(t,dim(sh*))]|) -> []
+  where <oncetd(?SKIP)>sh*
+
+  CheckArgs: 
+   (SCALAR(t),|[ matrix(_,dim(sh*))]|) -> []
+  where <oncetd(?SKIP)>sh*
+
+  CheckArgs: 
+  (SCALAR(t),|[matrix(scalar,dim(sh*))]|) -> []
+  where <oncetd(?SKIP())>sh*
+
+  CheckArgs: 
+   (|[matrix(t,dim(sh*))]|,|[matrix(t,dim(sh2*))]|) -> []
+  where <oncetd(?SKIP)>sh2*
+	; <zip'(eq <+ ?(_,SKIP()))>(sh*,sh2*)
+
+  CheckArgs: 
+   (|[matrix(t,dim(sh*))]|,|[matrix(_,dim(sh2*))]|) -> []
+  where  <oncetd(?SKIP)>sh2*
+	; <zip'(eq <+ ?(_,SKIP()))>(sh*,sh2*)
+
+  CheckArgs: 
+   (|[matrix(t,dim(sh*))]|,|[matrix(scalar,dim(sh2*))]|) -> []
+  where  <not(CHAR())>t
+	; <oncetd(?SKIP)>sh2*
+	; <zip'(eq <+ ?(_,SKIP()))>(sh*,sh2*)
+
+  CheckArgs: 
+   (|[matrix(t,dim(sh*))]|,|[matrix(scalar,dim(sh*))]|) -> []
+  where  <not(CHAR())>t
+
+  CheckArgs: 
+   (|[matrix(t,dim(sh*))]|,|[matrix(_,dim(sh*))]|) -> []
+
+  CheckArgs: 
+   (|[matrix(t,dim(sh*))]|,|[matrix(t2,dim(sh2*))]|) -> var-instatiation
+   where   <eq <+ Snd; ?ANY_TYPE > (t,t2)
+	; <zip(VarInstantiate <+ ![])>(sh*,sh2*)
+	; concat => var-instatiation
+	
+
+
+  VarInstantiate:
+  (t,|[x]|) -> [(|[x]|,t)]
+
+ CastArg:
+ (|[float]|,|[int]|)-> []
+
+ CastArg:
+ (|[bool]|,|[int]|)-> []
+
+ // Not strict type information
+  CheckArgsNotStrict:
+   (_, |[ _* ]|) -> []   
+
+
+  /** 
+   * (match-info, ret-types) -> ret-types instantiated
+   */
+  instantiate-shapes =
+   {| Instantiate:
+      ?(aa,in-args,out-args)
+    ; where(
+	  <zip(eq;![] <+ CheckArgs)>(aa,in-args)
+	; flatten-list
+	; map(InstantiateValue)
+      )
+    ; <topdown(try(Instantiate))>out-args
+   |}
+
+  InstantiateValue:
+  (|[x]|, e ) -> () 
+  where rules(Instantiate: |[ x ]| -> e)
+

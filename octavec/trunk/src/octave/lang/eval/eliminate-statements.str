@@ -1,0 +1,46 @@
+module octave/lang/eval/eliminate-statements
+
+rules
+ 
+  ElimIf:
+   |[ if e then e1 else e2 end ]| -> |[ e2 ]| 
+  where <not(Matrix(id))>e; <is-false> e
+
+  ElimIf:
+   |[ if e then e1 else e2 end ]| -> |[ e1 ]| 
+   where  <not(Matrix(id))>e; <is-true>e
+
+  ElimIf: 
+   |[ if e then e1 else e2 end ]| -> |[ { e } ]|
+   where <EmptySilent> e1;  <EmptySilent> e2
+
+  ElimIf:
+   |[ if e then e1 else e2 end ]| -> |[if e then e1 else {} end ]|
+   where <EmptySilent> e2
+
+  ElimIf:
+   |[ if e then e1 else e1 end ]| -> |[if e2 then e1 else {} end ]|
+   where  <EmptySilent> e1
+	; !|[ -e ]| => e2
+
+  ElimStats:
+   |[ { es* } ]| -> |[ { } ]|
+   where Stats(map(?Stats([]) ))
+
+  ElimWhile:
+   |[ while e do e1 end ]| -> |[ { } ]|
+   where <EmptySilent> e1
+
+  ElimWhile:
+   |[ while e do e1 end ]| -> |[ { } ]|
+   where <not(Matrix(id))>e; <is-false>e
+
+
+  ElimFor:
+   For(v,Matrix([]),e) -> Stats([])
+
+
+strategies
+
+  EmptySilent = 
+   ?Silent(Stats([]))

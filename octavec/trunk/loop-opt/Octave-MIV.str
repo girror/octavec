@@ -1,0 +1,95 @@
+module Octave-MIV
+imports 
+  liblib 
+  liboctavec
+  Octave-New-Norm
+  Octave-Dependence-Testing 
+  Octave-I-Test
+
+signature
+  constructors
+    MIV    : Constraint     
+
+strategies    
+
+  classify-miv =
+    ? (index, index2)
+    ; get-vars 
+    ; ?[_,_|_]
+    ; !MIV
+
+
+  MIV-test(|ivs) = 
+    if contains-range
+    then compute-range-deps(|ivs)
+    else compute-normal-deps(|ivs)
+    end
+
+  compute-normal-deps(|ivs) =
+    ? (sub1, sub2)
+    ; <get-normalized-expression(| ivs)> sub1 => exp1
+    ; <get-normalized-expression(| ivs)> sub2 => exp2
+    ; if <not-contains(?WRONG-INPUT)> (exp1,exp2)
+      then <collect-info(| ivs)> (exp1,exp2)
+      end
+  
+  compute-range-deps(|ivs) = 
+    ? (sub1, sub2)
+    ; if  <is-range> sub1
+      then !sub1 => range 
+         ; <get-normalized-expression(| ivs)>sub2 => no-range
+      else <get-normalized-expression(| ivs)>sub1 => no-range
+         ; !sub2 => range
+      end
+    ; <get-range> range => (bnds,stride)
+    ; <get-all-coeffs(|no-range)> ivs => numbers
+    ; <get-all-ubs> ivs => ubs
+    ; <zip>(numbers,ubs) => coeff
+    ; <get-outcome> no-range => out
+    ; <map(<subt>(<id>,out))> bnds => newrange
+    ; <i-test>(coeff,newrange,stride)
+
+  collect-info(| ivs) = 
+    ? (exp1,exp2) 
+    ; <get-all-coeffs(|exp1)>ivs => numbers1
+    ; <get-all-coeffs(|exp2)>ivs 
+    ; map(<subt>(0,<id>)) => numbers2
+    ; <get-all-ubs> ivs => ubs
+    ; <zip>(numbers1,ubs) => coeff1 
+    ; <zip>(numbers2,ubs) => coeff2 
+    ; <conc>(coeff1,coeff2) 
+    ; filter(not(? (0,_)))=> coeff
+    ; <compute-outcome> (exp1,exp2)
+    ; <i-test>(coeff,[<id>],1)
+ 
+  compute-outcome =
+    ? (exp1,exp2)
+    ; <get-outcome> exp1 => o1
+    ; <get-outcome> exp2 => o2
+    ; <subt>(o2,o1)
+  
+  get-number(| res) =
+    ? x
+    ; <oncetd( (? |[ i * x ]| ; !i => num)
+              <+ (? |[ e - x ]| ; !-1 => num)
+	      <+ (? |[ x ]|; !1 => num)
+	     ) >res 
+    ; <try(string-to-int)>num
+    <+ !0 
+    
+  get-outcome = 
+    if ? |[ e + i ]|
+    then <string-to-int>i
+    else !0
+    end
+  
+  get-normalized-expression(| ivs) = 
+      exp-norm(| ivs)
+    ; innermost(remove-minus)
+    ; check-linearity     
+
+  get-all-coeffs(|b) = 
+    map(Fst ; get-number(| b))
+
+  get-all-ubs =
+    map(Snd)

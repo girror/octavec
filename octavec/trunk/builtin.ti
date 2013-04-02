@@ -1,0 +1,541 @@
+definitions
+
+constants 
+
+ do_fortran_indexing :=  int
+ e       := float
+ eps     := float
+ pi      := float
+ realmax := float
+ realmin := float
+ j	 := complex
+ i	 := complex
+ I	 := complex
+
+variables
+
+ beep_on_error 	:= int 
+ warn_fortran_indexing := int
+ warn_num_to_str := int
+
+functions
+ quit :: ->
+ quit :: int ->
+ exit :: -> 
+ exit :: int ->
+
+ rand    :: -> float
+ rand    :: string -> scalar
+ rand    :: scalar -> matrix(float)
+ rand    :: int, int -> matrix(float)
+ 
+ disp    :: _ ->
+
+ umask 	 :: int -> int
+ getenv  :: string -> string
+ putenv  :: string, string -> string
+ rename  :: string,string  -> int
+ unlink  :: int -> int
+
+ getuid  :: -> int
+ geteuid :: -> int
+ getgid  :: -> int
+ getppid :: -> int
+ getpgrp :: -> int
+
+ tilde_expand :: string -> string
+ setpwent :: -> 
+ setgrent :: -> 
+
+ tmpnam   :: string, string -> string
+ tmpnam   :: string -> string
+
+ pause    :: int -> 
+ pause    :: -> 
+
+ sleep    :: int ->  
+
+ date :: -> string 
+ time :: ->float
+ ctime :: float -> string
+ isieee :: -> int
+
+ fnmatch :: string, matrix(char) -> matrix(int)
+ fnmatch :: string, string -> int
+
+// reshape :: matrix(int),int,int -> matrix(int)
+// reshape :: matrix(bool),int,int -> matrix(bool)
+
+ syl     :: matrix(int),matrix(int),matrix(int) ->  matrix(float)
+
+
+ fieldnames :: _ -> matrix(char)
+ isfield    :: _ , string -> bool
+ isstruct   :: _ -> bool
+
+ kron	    :: matrix(scalar), matrix(scalar) -> matrix(scalar)
+ undo_string_escapes :: string -> string
+
+ iscell    :: _  -> bool
+ iscellstr :: _  -> bool
+ ischar    :: _  -> bool
+ isglobal  :: string -> bool
+
+ cell      :: _* -> cell{}
+
+ char      :: _ -> string
+ char	   :: _* -> matrix(char)
+ 
+// qr :: matrix(_,dim(r,c)) -> matrix(float,dim(r,c)), matrix(float,dim(r,c)), matrix(int,dim(r,c))
+// qr :: matrix(_,dim(r,c)) -> matrix(float,dim(r,c)), matrix(float,dim(r,c))
+// qr :: matrix(_,dim(r,c)) -> matrix(float,dim(r,c))
+
+ qr :: matrix(_) -> matrix(float), matrix(float), matrix(int)
+ qr :: matrix(_) -> matrix(float), matrix(float)
+ qr :: matrix(_) -> matrix(float)
+
+
+ hess :: matrix(int) -> matrix(int)
+ hess :: matrix(int) -> matrix(int), matrix(int)
+
+// Only for testing the next 4 lines
+ printf  :: int, string, _* ->    
+ sprintf :: int, string, _* -> string 
+ sprintf :: string, int, _* -> string 
+ fprintf :: int, string, _* ->   
+ fwrite  :: int, _*   -> int   //THIS SHOULD ACCEPT BINARY VALUES????
+ print_usage :: ->
+
+ fopen   :: int -> int
+ fopen   :: string, string -> int, int
+ fclose  ::  int -> int
+
+
+
+////---------------------------
+
+// data.cc
+//  all :: scalar              -> bool
+//  all :: scalar, int         -> bool
+//  all :: matrix(scalar)      -> matrix(bool)
+
+
+  all :: _         -> matrix(bool)
+  all :: matrix(_), int -> matrix(bool)
+
+  any :: scalar              -> bool
+  any :: string              -> matrix(bool)
+  any :: string, int         -> matrix(bool)
+  any :: scalar, int         -> bool
+  any :: matrix(scalar)      -> matrix(bool)
+  any :: matrix(scalar), int -> matrix(bool)
+
+  atan2 :: scalar, scalar                 -> scalar
+  atan2 :: matrix(scalar), scalar         -> matrix(float)
+  atan2 :: scalar, matrix(scalar)         -> matrix(float)
+  atan2 :: matrix(scalar), matrix(scalar) -> matrix(float)
+
+  fmod :: scalar, scalar                 -> scalar
+  fmod :: matrix(scalar), scalar         -> matrix(float)
+  fmod :: scalar, matrix(scalar)         -> matrix(float)
+  fmod :: matrix(scalar), matrix(scalar) -> matrix(float)
+
+  cumprod :: int                  -> int 
+  cumprod :: int, int             -> int
+  cumprod :: matrix(int)          -> matrix(int)
+  cumprod :: matrix(int), int     -> matrix(int)
+  cumprod :: float                -> float
+  cumprod :: float, int           -> float
+  cumprod :: matrix(float)        -> matrix(float)
+  cumprod :: matrix(float), int   -> matrix(float)
+  cumprod :: complex              -> complex
+  cumprod :: complex, int         -> complex
+  cumprod :: matrix(complex)      -> matrix(complex)
+  cumprod :: matrix(complex), int -> matrix(complex)
+
+  cumsum :: int                  -> int  
+  cumsum :: int, int             -> int
+  cumsum :: matrix(int)          -> matrix(int)
+  cumsum :: matrix(int), int     -> matrix(int)
+  cumsum :: float                -> float 
+  cumsum :: float, int           -> float
+  cumsum :: matrix(float)        -> matrix(float)
+  cumsum :: matrix(float), int   -> matrix(float)
+  cumsum :: complex              -> complex 
+  cumsum :: complex, int         -> complex
+  cumsum :: matrix(complex)      -> matrix(complex)
+  cumsum :: matrix(complex), int -> matrix(complex)
+
+  diag :: int                  -> int 
+  diag :: int, int             -> matrix(int)
+  diag :: matrix(int)          -> matrix(int)
+  diag :: matrix(int), int     -> matrix(int)
+  diag :: float                -> float
+  diag :: float, int           -> matrix(float)
+  diag :: matrix(float)        -> matrix(float)
+  diag :: matrix(float), int   -> matrix(float)
+  diag :: complex              -> complex
+  diag :: complex, int         -> matrix(complex)
+  diag :: matrix(complex)      -> matrix(complex)
+  diag :: matrix(complex), int -> matrix(complex)
+
+  prod :: int                  -> int 
+  prod :: int, int             -> int
+  prod :: matrix(int)          -> matrix(int)
+  prod :: matrix(int), int     -> matrix(int)
+  prod :: float                -> float 
+  prod :: float, int           -> float
+  prod :: matrix(float)        -> matrix(float)
+  prod :: matrix(float), int   -> matrix(float)
+  prod :: complex              -> complex 
+  prod :: complex, int         -> complex
+  prod :: matrix(complex)      -> matrix(complex)
+  prod :: matrix(complex), int -> matrix(complex)
+ 
+
+// horzcat
+// vertcat
+// cat
+// permute
+// ipermute
+
+
+  length :: _ -> int
+  ndims :: _ -> int
+  numel :: _ -> int
+
+  size :: _, int -> int
+  size :: _      -> int, int
+  size :: _      -> matrix(int)
+
+  sum :: int                  -> int 
+  sum :: int, int             -> int
+  sum :: matrix(int)          -> matrix(int)
+  sum :: matrix(int), int     -> matrix(int)
+  sum :: float                -> float 
+  sum :: float, int           -> float
+  sum :: matrix(float)        -> matrix(float)
+  sum :: matrix(float), int   -> matrix(float)
+  sum :: complex              -> complex 
+  sum :: complex, int         -> complex
+  sum :: matrix(complex)      -> matrix(complex)
+  sum :: matrix(complex), int -> matrix(complex)
+
+  sumsq :: int                  -> int  
+  sumsq :: int, int             -> int
+  sumsq :: matrix(int)          -> matrix(int)
+  sumsq :: matrix(int), int     -> matrix(int)
+  sumsq :: float                -> float  
+  sumsq :: float, int           -> float
+  sumsq :: matrix(float)        -> matrix(float)
+  sumsq :: matrix(float), int   -> matrix(float)
+  sumsq :: complex              -> complex  
+  sumsq :: complex, int         -> complex
+  sumsq :: matrix(complex)      -> matrix(complex)
+  sumsq :: matrix(complex), int -> matrix(complex)
+
+  isbool    :: _ -> bool
+  islogical :: _ -> bool
+  iscomplex :: _ -> bool
+  isreal    :: _ -> bool
+  isempty   :: _ -> bool
+  isnumeric :: _ -> bool
+  islist    :: _ -> bool
+  ismatrix  :: _ -> bool
+
+   ones :: scalar* -> matrix(int)
+  // ones :: int+, string -> matrix(?)
+
+  zeros :: scalar* -> matrix(int)
+  zeros :: matrix(int) -> matrix(int)
+  zeros :: matrix(float) -> matrix(int)
+
+  //  zeros :: int+, string -> matrix(?)
+   
+   eye :: scalar* -> matrix(int)
+
+  hilb :: int -> matrix(float)
+
+  svd  :: matrix(float) -> matrix(float)
+  svd  :: matrix(float) -> matrix(float), matrix(float), matrix(float)
+  svd  :: matrix(int) -> matrix(float)
+  svd  :: matrix(int) -> matrix(float), matrix(float), matrix(float)
+
+  linspace :: complex, _      -> matrix(complex)
+  linspace :: _, complex      -> matrix(complex)
+  linspace :: complex, _, int -> matrix(complex)
+  linspace :: _, complex, int -> matrix(complex)
+
+// some linspace missing
+
+// reshape :: matrix(_), int* -> matrix(_)
+
+ reshape :: matrix(bool), matrix(int) -> matrix(bool)
+ reshape :: matrix(int), matrix(int) -> matrix(int)
+ reshape :: matrix(float), matrix(int) -> matrix(int)
+ reshape :: matrix(complex), matrix(int) -> matrix(complex)
+ reshape :: matrix(char), matrix(int) -> matrix(char)
+
+ reshape :: matrix(bool), int* -> matrix(bool)
+ reshape :: matrix(int), int* -> matrix(int)
+ reshape :: matrix(float), int* -> matrix(float)
+ reshape :: matrix(complex), int* -> matrix(complex)
+ reshape :: matrix(char), int* -> matrix(char)
+
+//  squeeze :: 
+
+ // defaults.cc
+
+ // rehash :: ->
+  
+ // dirfns.cc
+
+ // pwd :: -> 
+  pwd :: -> string
+
+//  readdir :: string -> cell
+
+  mkdir :: string -> int
+  mkdir :: string -> int, string
+
+  rmdir :: string -> int
+  rmdir :: string -> int, string
+
+  link :: string, string -> int
+  link :: string, string -> int, string
+
+  symlink :: string, string -> int
+  symlink :: string, string -> int, string
+
+  readlink :: string -> string
+  readlink :: string -> string, int
+  readlink :: string -> string, int, string
+
+  rename :: string, string -> int
+  rename :: string, string -> int, string
+
+/*
+  glob :: array of strings -> record
+  fnmatch :: array of strings -> matrix(int)
+*/
+
+  nargin :: -> int
+  nargout :: -> int
+
+  // error.cc
+
+  error :: string, _* -> 
+
+  warning :: string -> string
+
+  lasterr ::        -> string
+  lasterr :: string -> string
+
+  lastwarn ::        -> string
+  lastwarn :: string -> string
+
+  usage :: string, _* -> 
+
+
+  input :: string   -> 
+  input :: string, string -> string
+
+  // should not be allowed:  keyboard
+
+  echo :: string         -> 
+  echo :: string, string -> 
+
+
+
+
+  eig :: matrix(int) -> matrix(float)
+  eig :: matrix(int) -> matrix(float), matrix(float)
+  eig :: matrix(float) -> matrix(float)
+  eig :: matrix(float) -> matrix(float), matrix(float)
+  eig :: matrix(complex) -> matrix(float)
+  eig :: matrix(complex) -> matrix(float), matrix(float)
+
+
+
+  getrusage :: -> struct {
+                    idrss    := int
+                    inblock  := int
+                    isrss    := int
+                    ixrss    := int
+                    majflt   := int
+                    maxrss   := int
+                    minflt   := int
+                    msgrcv   := int
+                    msgsnd   := int
+                    nivcsw   := int
+                    nsignals := int
+                    nswap    := int
+                    nvcsw    := int
+                    oublock  := int
+                    stime    := struct {
+                                  sec  := int
+                                  usec := int
+                                }
+                    utime    := struct {
+                                  sec  := int
+                                  usec := int
+                                }
+                  }
+
+  localtime :: int -> struct {
+                    usec  := int
+                    year  := int
+                    mon   := int
+                    mday  := int
+                    sec   := int
+                    zone  := int
+                    min   := int
+                    wsay  := int
+                    hour  := int
+                    isdst := int
+                    yday  := int
+                  }
+  localtime :: float -> struct {
+                    usec  := int
+                    year  := int
+                    mon   := int
+                    mday  := int
+                    sec   := int
+                    zone  := int
+                    min   := int
+                    wsay  := int
+                    hour  := int
+                    isdst := int
+                    yday  := int
+                  }
+
+
+  givens :: complex, complex ->  float, float
+  givens :: complex, complex ->  matrix(float)
+  
+  givens :: float, float ->  float, float
+  givens :: float, float ->  matrix(float)
+  
+mapping functions
+  
+ abs       :: int  -> int
+ abs	   :: float  -> float
+ abs	   :: complex  -> float
+ abs       :: bool  -> int   
+
+ arg	   :: int -> int
+ arg	   :: float -> int
+ arg	   :: complex -> float
+
+
+ angle     :: complex -> float
+
+ exp	   :: int -> float
+ exp	   :: float -> float
+ exp	   :: complex -> complex
+
+ ceil      :: int    -> int
+ ceil	   :: float  -> int
+ ceil      :: complex  -> complex
+
+ floor     :: int    -> int
+ floor	   :: float  -> int
+ floor     :: complex  -> complex
+
+ gamma	   :: int -> float
+ gamma	   :: float -> float
+
+ round     :: int  -> int
+ round     :: float  -> int
+ round     :: complex  -> complex
+
+ finite    :: scalar -> bool
+
+ fix	   :: int     -> int
+ fix	   :: float   -> float
+ fix       :: complex -> complex
+
+ isalnum   :: char -> bool
+ isalpha   :: char -> bool
+ isascii   :: char -> bool
+ isdigit   :: char -> bool
+ isnan     :: scalar -> bool
+ isinf	   :: scalar -> bool
+
+ real      :: bool -> int
+ real      :: int  -> int
+ real	   :: float -> float
+ real      :: complex -> float
+
+
+ imag      :: bool -> int
+ imag      :: int  -> int
+ imag	   :: float -> float
+ imag      :: complex -> float
+ 
+ conj      :: bool -> int
+ conj      :: int  -> int
+ conj	   :: float -> float
+ conj      :: complex -> complex
+
+ sign      :: scalar  -> int
+
+ sin	   :: int  -> float
+ sin	   :: float -> float
+ cos	   :: int  -> float
+ cos	   :: float -> float
+ cos	   :: complex -> complex
+ tan	   :: int  -> float
+ tan	   :: float -> float
+
+ sinh	   :: int  -> float
+ sinh	   :: float -> float
+ cosh	   :: int  -> float
+ cosh	   :: float -> float
+ tanh	   :: int  -> float
+ tanh	   :: float -> float
+
+
+ asin	   :: int  -> complex
+ asin	   :: float -> complex
+ asin	   :: complex -> complex
+
+ acos	   :: int  -> complex 
+ acos	   :: float -> complex
+ acos 	   :: complex -> complex
+ atan	   :: int  -> complex
+ atan	   :: float -> complex
+ atan 	   :: complex -> complex
+
+
+
+// If the argument of sqrt,log is a negative
+// number the outcome is a complex value
+
+ sqrt	   :: int     -> float
+ sqrt	   :: float   -> float
+ sqrt      :: complex -> complex
+
+ log	   :: int     -> float
+ log	   :: float   -> float
+ log       :: complex -> complex
+
+ log2	   :: int     -> float
+ log2	   :: float   -> float
+ log2     :: complex -> complex
+
+ log10	   :: int     -> float
+ log10	   :: float   -> float
+ log10     :: complex -> complex
+
+ toascii   :: char    -> int
+
+ tolower   :: char    -> char
+ 
+
+ max :: matrix(int) -> int
+ max :: matrix(float) -> float
+ max :: matrix(complex) -> complex
+ max :: int -> int
+ max :: float -> float
+ max :: complex -> complex

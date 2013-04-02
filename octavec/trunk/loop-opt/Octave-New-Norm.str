@@ -1,0 +1,385 @@
+module Octave-New-Norm
+imports 
+  liblib 
+  liboctavec
+
+strategies  
+
+  exp-norm(| ivs) =
+    innermost(SwapOp(| ivs) <+ EvalBinOp <+ EvalStat)
+
+  is-iv(|ivs) =
+      oncetd(? Var(x))     
+    ; <check-iv-list(| ivs)> x
+  
+  check-iv-list(| ivs) = 
+    ? x 
+    ; <? [e|es]> ivs
+    ; <?e <+ check-iv-list(|es)> x  
+
+rules
+  
+  SwapOp(|ivs) :
+    |[ ((e1 + e2) + e3) ]| -> e
+    where <is-iv(|ivs)> e1 => iv1
+        ; <is-iv(|ivs)> e2 => iv2
+        ; <is-iv(|ivs)> e3 => iv3
+        ; ( (<string-gt> (iv2,iv3); !|[ ((e1 + e3) + e2) ]| => e) 
+         <+ (<eq>(iv2,iv3); <EvalMul> |[(e2 +e3) ]| => e7; !|[ (e1 + e7) ]| => e ) 
+         )
+
+  SwapOp(|ivs) :
+    |[ ((e1 + e2) - e3) ]| -> |[ ((e1 - e3) + e2) ]|
+    where <is-iv(|ivs)> e1 => iv1
+        ; <is-iv(|ivs)> e2 => iv2
+        ; <is-iv(|ivs)> e3 => iv3
+        ; <string-gt> (iv2,iv3)
+        
+  SwapOp(|ivs) :
+    |[ e1 + e2 ]| -> |[ e2 + e1 ]|
+    where <is-iv(|ivs)> e1 => iv1
+        ; <is-iv(|ivs)> e2 => iv2
+        ; <string-gt> (iv1,iv2)
+
+  SwapOp(| ivs) :
+    |[ ((e1 - e2) - e3) ]| -> |[ ((e1 - e3) - e2) ]|
+    where <is-iv(|ivs)> e1 => iv1
+        ; <is-iv(|ivs)> e2 => iv2
+        ; <is-iv(|ivs)> e3 => iv3
+        ; <string-gt> (iv2,iv3)
+         
+  EvalMul :
+     |[ ((i*x) + (j*x)) ]| -> |[ k*x ]|
+    where <addS> (i,j) => k
+                                                                                         
+  EvalMul :
+     |[ (x + (j*x)) ]| -> |[ k*x ]|
+    where <addS> ("1",j) => k
+                                                                                         
+  EvalMul :
+     |[ ( (j*x) + x) ]| -> |[ k*x ]|
+    where <addS> ("1",j) => k
+         
+// MINUS
+
+   EvalBinOp :
+     |[ e - 0 ]| -> |[ e ]|
+
+   EvalBinOp :
+     |[ e - e ]| -> |[ nil ]|
+
+   EvalBinOp :
+    |[ ((0-e) + e1) ]| -> |[ e1 - e ]|
+                                                                                   
+   EvalBinOp :
+     |[ i - j ]| -> |[ k ]|
+    where <gtS> (i,j)
+        ; <subtS> (i,j) => k
+ 
+   EvalBinOp :
+     |[ e + 0 ]| -> |[ e ]|
+    
+   EvalBinOp :
+     |[ (e - (e1-e2)) ]| -> |[ ((e-e1)+e2)  ]|
+
+   EvalBinOp :
+     |[ (e-(e1+e2)) ]| -> |[ ((e-e1)-e2)  ]|
+  
+   EvalBinOp :
+     |[ (x - (e1 + (i*x))) ]| -> |[ ((0 - (k*x)) - e1) ]|
+    where <subtS>(i,"1") => k
+	  
+   EvalBinOp :
+     |[ (x - (i * x)) ]| -> |[ (0 - (k*x)) ]|
+     where <subtS>(i, "1") => k 
+
+  EvalBinOp :
+     |[ ((e + i) - j) ]| -> |[ e + k ]|
+    where  <gtS> (i,j) 
+         ; <subtS> (i,j) => k
+   	 
+   EvalBinOp :
+     |[ ((e + i) - j) ]| -> |[ e - k ]|
+    where  <ltS> (i,j) 
+         ; <subtS> (j,i) => k
+
+   EvalBinOp :
+     |[ ((e + i) - i) ]| -> |[ e ]|
+
+   EvalBinOp :
+     |[ ((i + e) - e1) ]| -> |[ ((e + i) - e1) ]|
+
+// UNIVERSAL 
+
+   EvalBinOp :
+     |[ ((e + (i * x)) + (j * x)) ]| -> |[ (e + (k * x)) ]|
+    where <addS> (i,j) => k
+        
+   EvalBinOp :
+     |[ ((e - (i * x)) - (j * x)) ]| -> |[ (e - (k * x)) ]|
+    where <addS> (i,j) => k
+          
+   EvalBinOp :
+     |[ ((e - (i * x)) - x) ]| -> |[ (e - (k * x)) ]|
+    where  <addS> (i,"1") => k
+         
+   EvalBinOp :
+     |[ (((i * x) - e) + x) ]| -> |[ ((k * x) - e) ]|
+    where <addS> (i,"1") => k
+         
+   EvalBinOp :
+     |[ ((e - x) - (j * x)) ]| -> |[ (e - (k * x) ) ]|
+    where <addS> ("1",j) => k
+    	      
+   EvalBinOp :
+     |[ ( e - (x - (j * x))) ]| -> |[ (e - (k * x) ) ]|
+    where <addS> ("1",j) => k  
+            
+   EvalBinOp :
+     |[ ((e + (i * x)) - (j * x)) ]| -> |[ (e - (k * x)) ]|
+    where <ltS> (i,j) 
+        ; <subtS> (j,i) => k
+        
+   EvalBinOp :
+     |[ ((e + (i * x)) - (j * x)) ]| -> |[ (e + (k * x)) ]|
+    where <gtS> (i,j) 
+        ; <subtS> (i,j) => k 
+        	 
+   EvalBinOp :
+     |[ ((e + (i * x)) - (i * x)) ]| -> |[ e ]|
+     
+   EvalBinOp :
+     |[ ((e - (i * x)) + (j * x)) ]| -> |[ (e + (k * x)) ]|
+    where <ltS> (i,j) 
+        ; <subtS> (j,i) => k    
+
+   EvalBinOp :
+     |[ ((e - (i * x)) + (j * x)) ]| -> |[ (e - (k * x)) ]|
+    where <gtS> (i,j) 
+        ; <subtS> (i,j) => k 
+
+   EvalBinOp :
+     |[ ((e - (i * x)) + (i * x)) ]| -> |[ e ]|     
+
+   EvalBinOp :
+     |[ ((e1 + i) - (e2 + j) ) ]| -> |[ ((e1 - e2) - k) ]|
+    where  <ltS>(i,j)
+         ; <subtS> (j,i) => k
+ 
+   EvalBinOp :
+     |[ ((e1 + i) - (e2 + j) ) ]| -> |[ ((e1 - e2) + k) ]|
+    where  <gtS>(i,j)
+         ; <subtS> (i,j) => k
+
+   EvalBinOp :
+     |[ ( (e1 - i) - (e2 - i) ) ]| -> |[ e1 - e2 ]|
+ 
+   EvalBinOp :
+     |[ ( (e1 - i) - (e2 - j) ) ]| -> |[ ( (e1 - e2) + k) ]|
+    where  <ltS>(i,j)
+         ; <subtS> (j,i) => k    
+
+   EvalBinOp :
+     |[ ( (e1 - i) - (e2 - j) ) ]| -> |[ ( (e1 - e2) - k) ]|
+    where  <gtS>(i,j)
+         ; <subtS> (i,j) => k
+
+   EvalBinOp :
+     |[ ( (e1 - i) - (e2 + i) ) ]| -> |[ e1 - e2 ]|
+	 
+   EvalBinOp :
+     |[ ( (e1 - i) - (e2 + j) ) ]| -> |[ ( (e1 - e2) - k) ]|
+    where <addS> (i,j) => k
+         
+   EvalBinOp :
+     |[ ( (e1 + i) - (e2 - j) ) ]| -> |[ ( (e1 - e2) + k) ]|
+    where  <addS> (i,j) => k
+             
+   EvalBinOp :
+     |[ ( (i * x) -  ((i2 * x2) - (i3 * x3))) ]| -> |[ ( ((i * x) - (i2 * x2)) + (i3 * x3)) ]|
+     
+// PLUS
+   
+   EvalBinOp :
+     |[ i + j ]| -> |[ k ]|
+    where <addS> (i,j) => k      
+  	 
+   EvalBinOp :
+     |[ (x + (i * x)) ]| -> |[ k * x ]|
+    where <addS> (i,"1") => k      
+  	 
+   EvalBinOp :
+     |[ (e - (x - (i * x))) ]| -> |[ (e - (k * x)) ]|
+    where <addS> (i,"1") => k      
+  	 
+   EvalBinOp :
+     |[ ((e + i) + j) ]| -> |[ (e + k) ]|
+    where <addS> (i,j) => k 
+  	 
+   EvalBinOp :
+     |[ ((e - i) + j) ]| -> |[ e - k ]|
+    where  <gtS> (i,j) 
+         ; <subtS> (i,j) => k
+  
+  EvalBinOp :
+     |[ ((e - i) + j) ]| -> |[ e + k ]|
+    where  <ltS> (i,j) 
+         ; <subtS> (j,i) => k
+	 
+   EvalBinOp :
+     |[ ((e - i) + i) ]| -> |[ e ]|
+
+   EvalBinOp :
+     |[ ( (e1 + i) + (e2 + j) ) ]| -> |[ ( (e1 + e2) +  k) ]|
+    where <addS> (i,j) => k
+
+   EvalBinOp :
+     |[ ( (e1 - i) + (e2 - j) ) ]| -> |[ ((e1 + e2) - k) ]|
+    where <addS> (i,j) => k
+
+   EvalBinOp :
+     |[ ( (e1 - i) + (e2 + i) ) ]| -> |[ e1 + e2 ]|
+	 
+   EvalBinOp :
+     |[ ( (e1 - i) + (e2 + j) ) ]| -> |[ ((e1 + e2) + k) ]|
+    where  <ltS>(i,j)
+         ; <subtS> (j,i) => k
+
+   EvalBinOp :
+     |[ ((e1 - i) + (e2 + j) ) ]| -> |[ ((e1 + e2) - k) ]|
+    where  <gtS>(i,j)
+         ; <subtS> (i,j) => k
+
+   EvalBinOp :
+     |[ ( (e - x) + (j * x) ) ]| -> |[ (e + (k * x)) ]|
+    where <subtS> (j,"1") => k
+
+   EvalBinOp :
+     |[ ( (e1 + i) +  (e2 - i) ) ]| -> |[ e1 + e2 ]|
+
+   EvalBinOp :
+     |[ ((e1 + i) + (e2 - j) ) ]| -> |[ ((e1 + e2) - k) ]|
+    where  <ltS>(i,j)
+         ; <subtS> (j,i) => k
+ 
+   EvalBinOp :
+     |[ ( (e1 + i) + (e2 - j) ) ]| -> |[ ( (e1 + e2) +  k) ]|
+    where  <gtS>(i,j)
+         ; <subtS> (i,j) => k
+
+// MISC
+  
+   EvalBinOp :
+     |[ ((x + e) + x) ]| -> |[ ((2 * x) + e) ]|
+
+   EvalBinOp :
+     |[ (x * (e + e1)) ]| -> |[ ((x * e) + (x * e1)) ]|
+
+   EvalBinOp :
+     |[ ((x - e) + x) ]| -> |[ ((2 * x) - e) ]|
+
+   EvalBinOp :
+     |[ ((x + e) - x) ]| -> |[ e ]|
+	 
+   EvalBinOp :
+     |[ ((x - e) - x) ]| -> |[ 0 - e ]|
+
+   EvalStat :
+     |[ (i * (j * x)) ]| -> |[ k * x ]|
+     where <mulS>(i,j) => k
+
+   EvalStat :
+     |[ (x * (j * y)) ]| -> |[ ((j * x) * y) ]|
+
+   EvalStat :
+     |[ ((e - ((j * x) * y)) + e1)  ]| -> |[ ((e + e1) - ((j * x) * y)) ]|
+
+   EvalStat :
+     |[ ((e - ((j * x) * y)) - e1)  ]| -> |[ ((e - e1) - ((j * x) * y)) ]|
+     
+// VAR
+
+   EvalStat :
+     |[ (((i * x) - e) + (j * x)) ]| -> |[ ((k * x) - e) ]|
+    where <addS>(i,j) => k  
+
+   EvalStat :
+     |[ ((e - (i * x)) + x) ]| -> |[ (e - (k * x)) ]|
+    where <subtS>(i,"1") => k
+
+   EvalStat :
+     |[ (((i * x) + e) - (j * x))  ]| -> |[ ((k * x) + e)  ]|
+    where <gtS>(i,j)
+        ; <subtS>(i,j) => k
+
+   EvalStat :
+     |[ (((i * x) + e) - (j * x))  ]| -> |[ (e - (k * x))  ]|
+    where <ltS>(i,j)
+        ; <subtS>(j,i) => k
+
+   EvalStat :
+     |[ (e1 + (e2 + e3)) ]| -> |[ ((e1 + e2) + e3) ]|
+
+   EvalStat :
+     |[ ((e1 + i) + e2) ]| -> |[ ((e1 + e2) + i) ]|
+          
+   EvalStat :
+     |[ ((e1 + i) - e2) ]| -> |[ ((e1 - e2) + i) ]|        
+
+   EvalStat :
+     |[ ((e1 - i) - e2) ]| -> |[ ((e1 - e2) - i) ]|  
+     where <not(?"0")> i
+
+   EvalStat :
+     |[ ((e1 - i) - j) ]| -> |[ e1 - k ]|
+     where <addS>(i,j) => k
+ 
+// MUL
+
+   EvalBinOp :
+     |[ x * i ]| -> |[ i * x ]|  
+
+   EvalBinOp :
+     |[ i * j ]| -> |[ k ]|
+    where <mulS> (i,j) => k
+
+   EvalBinOp :
+     |[ ((e1 - i) + e2) ]| -> |[ ((e1 + e2) - i) ]|
+	 
+   EvalBinOp :
+     |[ ((i * x) + (j * x)) ]| -> |[ k * x ]|
+    where <addS> (i,j) => k
+
+   EvalBinOp :
+     |[ ( x + (j * x)) ]| -> |[ k * x ]|
+    where <addS> ("1",j) => k
+       
+   EvalBinOp :
+     |[ ((j * x) + x) ]| -> |[ k * x ]|
+    where <addS> ("1",j) => k
+     
+   EvalBinOp :
+     |[ ((i * x) - (j * x)) ]| -> |[ k * x ]|
+    where <gtS> (i,j)
+        ; <subtS> (i,j) => k  
+     
+   EvalBinOp :
+     |[ ((i * x) - (j * x)) ]| -> |[ (0 - (k * x)) ]|
+    where <ltS> (i,j)
+        ; <subtS> (j,i) => k
+
+   EvalBinOp :
+     |[ (e * (i - j)) ]| -> |[ ((i * e) - (j * e)) ]|
+    
+   EvalBinOp :
+     |[ (i * (e1 + e2)) ]| -> |[ ((i * e1) + (i * e2)) ]|
+
+   EvalBinOp :
+     |[ (i * (e1 - e2)) ]| -> |[ ((i * e1) - (i * e2)) ]|
+     
+// DIV
+
+   EvalBinOp :
+     |[ i / j ]|-> |[ k ]|
+    where <not("0")> j
+        ; <divS> (i,j) => k 

@@ -1,0 +1,53 @@
+module Eval-Globals
+strategies
+
+
+ is-global-var =  global-init <+ global-no-init
+
+ global-no-init = 
+  {x: ?|[global x ]|
+    ;where(
+      <IsGlobal> |[ x ]|
+      <+  rules(IsGlobal : |[ x ]|-> () )
+     )
+  }
+ 
+  global-init =
+  {x: ?GlobalInit(x,e)
+     ; where(
+	 rules(IsGlobal: |[ x ]|)
+	; <not(GlobalVal)>|[ x ]| // not previously initialized
+        ; if <is-const> e
+          then  <create-rule-Value> (|[ x ]|, e)
+          else  <undefine-rule-Value> |[ x ]| end
+      )
+  }
+
+
+
+  get-root-values =
+  {v:
+     ?v
+   ; strip-annos
+   ; get-root-record
+   ; (Value <+ GlobalVal)
+  }
+     
+  get-values-record(|rhs, fv) =
+     (GlobalVal <+ Value <+ ![])
+   ; (?(_,<id>) <+ id)
+   ; add-to-record-structure(|rhs, fv)
+
+
+  add-to-record-structure(|rhs,fv) =
+ {t,r,rs:
+   (   ?Record(rs)
+      ; <not(?[])>rs
+      ;<insert-val-in-record(|rhs)>(fv, Record(rs))
+
+    <+ (?Record([]) <+ ?[] <+ is-const)
+      ;<create-record> (fv,rhs)
+   )
+ }
+
+

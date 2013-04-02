@@ -1,0 +1,166 @@
+module TC-Subscript
+
+rules 
+
+ TcExp: 
+  |[lv::ts[(:)::ts1] ]| ->   |[lv::ts[(:)::ts1]::ts]| 
+  where <GetTypeShape;?MATRIX(_,_)>ts
+
+
+  TcExp:
+  |[ lv::ts [a*] ]| -> |[ (lv:: ts [a1*])::ts1 ]|
+  where  <fix-colons>(a*,ts) => a1*
+	;<get-shape-subscript>(a1*,ts) => ts1
+
+ TcExp: 
+  |[lv::ts[1::int]]| ->   |[lv::ts[1::int]::ts1 ]| 
+  where <get-scalar>ts =>ts1
+
+strategies
+  shape-subscript = get-shape-subscript
+
+ 
+
+ get-shape-subscript =
+    where(Snd; GetAType =>t)
+  ; (id, GetShape) 
+  ; compute-shape-subscript(fix-dimensions-right) => sh* 
+  ; ( not([Int("1"),Int("1")]) ; !|[matrix(t,dim(sh*))]| <+ !SCALAR(t) ) 
+
+
+
+
+ compute-shape-subscript(fix-dimensions-dir) = 
+   try(remove-index-padding)
+  ; ?(a*, dims)
+  ; (index-magic-colon <+ index-colon-expressions )
+  ; try(fix-dimensions-dir) 
+
+
+
+ /**
+  * arity(a*) < #dims 
+  * m(3,4,5) ; m(:,:) => m(2,20)
+  *          ; m(:)   => m(40,1)
+  */
+ index-magic-colon = 
+  ?(a*, dims) 
+  ; where(<has-index-magic-colon>a*)
+  ; get-magic-colon-shape => magic-shape
+  ; <init> a*   => a1*
+  ; <length> a1* => tt
+  ; <take(!tt)> dims => preserve-dims
+  ; <fixed-shape-size>(a1*,preserve-dims)
+  ; <conc>(<id>,[Int(magic-shape)])
+
+
+ /** 
+  * index * shape -> shape
+  */
+ get-magic-colon-shape = 
+   ?(a*, dims) 
+  ; (length, length)
+  ; leq 
+  ; <length;dec> a* => tt
+  ; <drop(!tt)> dims
+  ; matrix-shape
+
+
+ fixed-shape-size =
+   ?(a*,dims)
+  ; if <not(map(?Colon))>a*
+    then <index-colon-expressions> (a*,dims)
+    else !dims end
+
+
+
+ index-colon-expressions =  
+  ?(a*, dims)
+  ; fix-colons // maybe this is wrong
+  ; <map(try(Flat-Dim))>a* => a1*
+  ; map(extract-shape;?[_,<id>])
+
+
+ /**
+  * shape of m is (3,3,3)
+  * m(1,2,3,4,:,6) ==> indexes 4,:,6 are padding
+  * remove-padding-expressions from index of subscripts
+  */
+ remove-index-padding =
+  ?(a*, dims)
+  ;where(
+      (length,length)
+    ; ?(index,num_dims)
+    ; geq
+    ; <subt>(index,num_dims) => padding
+   )
+  ; <drop(!padding)>a*
+  ; !(<id>,dims)
+
+
+
+
+/**
+ * add padding to the right, or at the end 
+ */
+ add-padding(|e) =
+  ?(a*, dims)
+  ; (length,length)  
+  ; swap
+  ; subt
+  ; dec 
+  ; upto
+  ; map(!e)
+  ; <conc>(a*,<id>)
+
+
+  matrix-shape =
+   foldr(!"1", (?Int(<id>),id) ; mulS)
+
+  fix-colons =
+   ?(a*,ts)
+   ;(id,try(GetShape))
+   ; zip'(set-shape-colon <+ Fst)
+
+  set-shape-colon =
+  {d,i:
+    ?(|[(:):: ts]|,Int(i))
+   ; !MATRIX(INT,[Int("1"),Int(i)]) => ts1
+   ; !|[(:)::ts1]|
+  }
+
+ /**
+  * [1,3,4] => [3,4]
+  */
+ squeeze-left(s) =
+    where(length;  <gt>(<id>,2))
+   ; drop-while(s)
+
+
+ /**
+  * [1,3,4,1,1] => [1,3,4]
+  */
+ squeeze-right(s) = 
+    reverse
+  ; try(squeeze-left(s))
+  ; reverse
+ 
+  squeeze-index(s) =
+   try(squeeze-right(s))
+
+  fix-dimensions-right = 
+  (?[]; ![Int("1"),Int("1")] <+ ?[x]; ![x,Int("1")])
+
+
+  fix-dimensions =
+  (?[]; ![Int("1"),Int("1")] <+ ?[x]; ![Int("1"),x])
+
+
+  Flat-Dim:|[ i::ts ]| -> |[ 1::ts ]|
+  Flat-Dim:|[ true::ts ]| ->  |[ 1::ts ]| 
+
+
+ strategies
+
+  has-index-magic-colon =
+   last; ?Colon

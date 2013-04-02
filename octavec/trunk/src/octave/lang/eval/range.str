@@ -1,0 +1,17 @@
+module octave/lang/eval/range
+rules
+//   EvalRange:
+//   |[ (i : j : k) ]| -> Matrix([<range-integers>(i,j,k)])
+//   where <ltS>(i,k); <not(?"0")>j
+
+   EvalRange:
+   |[ (e : e1 : e) ]| -> |[ e ]| where <not(?|[ 0 ]|)> e1 
+
+   EvalRange:
+   |[ (i : j : k) ]| -> Matrix([])
+   where <gtS>(i,k)
+
+   EvalRange:
+   |[ (e : 0 : e1) ]| -> Matrix([])
+
+

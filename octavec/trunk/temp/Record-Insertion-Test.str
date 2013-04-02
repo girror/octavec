@@ -1,0 +1,222 @@
+module Record-Insertion-Test
+imports sunit  lib Record-Lib Octave-Constructs 
+ 
+overlays
+
+ term-type = RECORD([ 
+	("f", INT),
+        ("b", RECORD([ ("c", FLOAT) ])),
+        ("g", RECORD([ ("f", FLOAT) ])),
+        ("r", RECORD([ ("d", RECORD([ ("f", FLOAT) ,("h", NIL)])) ]))          
+         ])
+
+
+ otro-type =RECORD([ 
+	("f", INT),
+        ("b", RECORD([ ("c", FLOAT) ])),
+	("w", MATRIX(NIL)),
+        ("g", RECORD([ ("f", FLOAT) ])),
+        ("r", RECORD([ ("d", RECORD([ ("f", FLOAT) ,("h", NIL)])) ]))          
+         ])
+
+
+ path0 = ["b", "c"]
+ path1 = ["b"]
+ path2 = ["b", "r"]
+ path3 = ["b", "d", "f"]
+ path4 = ["r", "d", "f"]
+ path5 = ["w","x"]
+
+ fv1 =  FieldVar(FieldVar(FieldVar(Var("a"),"r"),"d"),"f")
+ fv2 =  FieldVar(FieldVar(Var("a"),"g"),"f")
+ fv3 =  FieldVar(Var("a"),"f")
+ fv4 =  FieldVar(Var("a"),"r")
+
+ fieldvar1 = FieldVar(FieldVar(FieldVar(Var("a"),"r"),"d"),"k")
+ fieldvar2 = FieldVar(FieldVar(Var("a"),"g"),"k")
+ fieldvar3 = FieldVar(Var("a"),"k")
+ fieldvar4 = FieldVar(FieldVar(Var("a"),"b"),"k")
+ fieldvar5 = FieldVar(FieldVar(Var("a"),"t"),"k")
+ fieldvar6 = FieldVar(FieldVar(FieldVar(Var("a"),"r"),"d"), "k")
+
+
+ fieldvar7= FieldVar(FieldVar(FieldVar(Var("a"),"r"),"d"), "h")
+ fieldvar8= FieldVar(FieldVar(Var("a"),"r"),"d")
+
+ fieldvar9= FieldVar(FieldVar(Var("a"),"w"),"x")
+ 
+strategies 
+
+
+  io-Record-Insertion-Test = 
+    test-suite(!"Record-Insertion-Test",
+        tests-path-traverse
+       ; tests-insertion
+       ; test-get-fieldvar-type
+       ; test-create-record
+       ; last-test
+       ; test-replace
+    )
+
+
+ tests-path-traverse =
+    apply-test(!"test0  unconsumed path and type"
+	, path-traverse-rose-tree
+	, !(path0, term-type)
+	, !([],FLOAT)
+	)
+
+    ;apply-test(!"test1  unconsumed path and type"
+        , path-traverse-rose-tree
+	, !(path1, term-type)
+	, !([],RECORD([("c",FLOAT)]))
+	)
+
+    ;apply-test(!"test2  unconsumed path and type"
+        , path-traverse-rose-tree
+	, !(path2, term-type)
+	, !(["r"],())
+	)
+
+    ;apply-test(!"test3 unconsumed path and type"
+        , path-traverse-rose-tree
+	, !(path3, term-type)
+	, !(["d","f"],())
+	)
+    ;apply-test(!"test4 unconsumed path and type"
+        , path-traverse-rose-tree
+	, !(path4, term-type)
+	, !([],FLOAT)
+        )
+
+
+
+  tests-insertion =
+    apply-test(!"test5 insertion"
+        , insert-val-in-record(|INT)
+	, !(fieldvar1,term-type)
+	, !RECORD([("f",INT),("b",RECORD([("c",FLOAT)])),("g",RECORD([("f",FLOAT)])),
+	   ("r",RECORD([("d",RECORD([("f",FLOAT),("h",NIL),("k",INT)]))]))])
+
+        );
+ 
+    apply-test(!"test6 insertion"
+        , insert-val-in-record(|INT)
+	, !(fieldvar2, term-type)
+	, !RECORD([("f",INT),("b",RECORD([("c",FLOAT)])),
+	("g",RECORD([("f",FLOAT),("k",INT)])),("r",RECORD([("d",RECORD([("f",FLOAT),
+	("h",NIL)]))]))])
+        );
+ 
+    apply-test(!"test7 insertion"
+        , insert-val-in-record(|INT)
+	, !(fieldvar3,term-type)
+	, !RECORD([("f",INT),("b",RECORD([("c",FLOAT)])),
+	("g",RECORD([("f",FLOAT)])),("r",RECORD([("d",RECORD([("f",FLOAT),
+	("h",NIL)]))])),("k",INT)])
+        );
+ 
+    apply-test(!"test8 insertion"
+        , insert-val-in-record(|INT)
+	, !(fieldvar4,term-type)
+	, !RECORD([("f",INT),("b",RECORD([("c",FLOAT),("k",INT)])),
+	("g",RECORD([("f",FLOAT)])),("r",RECORD([("d",
+	RECORD([("f",FLOAT),("h",NIL)]))]))])
+        );
+ 
+    apply-test(!"test9 insertion"
+        ,  insert-val-in-record(|MATRIX(INT))
+	, !(fieldvar6,term-type)
+	, !RECORD([("f",INT),("b",RECORD([("c",FLOAT)])),("g",RECORD([("f",FLOAT)])),
+	   ("r",RECORD([("d",RECORD([("f",FLOAT),("h",NIL),("k",MATRIX(INT))]))]))])
+
+        )
+
+   ; apply-test(!"test9.5 insertion"
+        ,  insert-val-in-record(|RECORD(["W",MATRIX(INT)]))
+	, !(fieldvar6,term-type)
+	, !RECORD([("f",INT),
+		("b",RECORD([("c",FLOAT)])),
+		("g",RECORD([("f",FLOAT)])),
+		("r",RECORD([("d",RECORD([("f",FLOAT),
+			("h",NIL),
+			("k",RECORD(["W",MATRIX(INT)]))]))]))])
+        )
+   ; apply-and-show(!"test9.7 insertion"
+        ,  insert-val-in-record(|RECORD(["W",MATRIX(INT)]))
+	, !(fieldvar5,term-type)
+        )
+
+
+  test-get-fieldvar-type =
+    apply-test(!"test10 get fieldvar type"
+        , get-rose-element
+	, !(term-type,fv1)
+	, !FLOAT);
+    apply-test(!"test11 get fieldvar type"
+        ,get-rose-element
+	, !(term-type,fv2)
+	, !FLOAT);
+    apply-test(!"test12 get fieldvar type"
+        ,get-rose-element
+	, !(term-type,fv3)
+	, !INT);
+    apply-test(!"test12.1 get fieldvar type"
+        ,get-rose-element
+	, !(term-type,fv4)
+	, !RECORD([ ("d", RECORD([ ("f", FLOAT) ,("h", NIL)])) ])
+	)
+
+
+
+ test-create-record =
+    apply-test(!"test13 get fieldvar type"
+        , create-record-path(|"RECORD")
+	, !(path0,INT)
+	, !RECORD([("b",RECORD([("c",INT)]))])
+        )
+;
+    apply-test(!"test14 get fieldvar type"
+        , create-record(|"RECORD")
+	, !(fv3, FLOAT)
+	, !RECORD([("f", FLOAT)]))
+ 
+
+
+
+
+ last-test =
+    apply-test(!" 15 previous  test"
+        , path-traverse-rose-tree
+	, !(["a","t","k"], term-type)
+	, !(["a","t","k"],())
+	)
+   ;apply-test(!" 16 previous  test"
+        , create-record-path(|"RECORD")
+	, !(["t","k"], INT)
+	, !RECORD([("t",RECORD([("k",INT)]))])
+	)
+   ;apply-test(!" 17 previous  test"
+        , insert-val-in-record(|INT)
+	, !(fieldvar5,term-type)
+        , !RECORD([("f",INT),
+		("b",RECORD([("c",FLOAT)])),
+		("g",RECORD([("f",FLOAT)])),
+		("r",RECORD([("d",RECORD([("f",FLOAT),("h",NIL)]))])),
+		("t",RECORD([("k",INT)]))])
+        )
+   ;apply-and-show(!" 18 previous  test"
+        , insert-val-in-record(|INT)
+	, !( fieldvar9, otro-type)
+        )
+
+
+   test-replace = 
+	apply-test(!" 20 replacing"
+        , replace-in-rose-tree(|INT)
+	, !(fv1, term-type)
+	, !RECORD([("f",INT),
+		("b",RECORD([("c",FLOAT)])),
+		("g",RECORD([("f",FLOAT)])),
+		("r",RECORD([("d",RECORD([("f",INT),("h",NIL)]))]))])
+	)

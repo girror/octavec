@@ -1,0 +1,12 @@
+#!/bin/sh
+
+if [ -f /etc/gentoo-release ] ; then
+  # Environment variables for our Gentoo friends.
+  export WANT_AUTOMAKE="1.8"
+  export WANT_AUTOCONF="2.59"
+fi
+
+set -e
+
+autoxt
+autoreconf -ifv

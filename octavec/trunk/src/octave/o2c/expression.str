@@ -1,0 +1,187 @@
+module octave/o2c/expression
+imports 
+  octave/lang/cons/-
+  octave/o2c/-
+
+// variables
+rules
+
+  TranslateExp = 
+    ?exp ; log(|Debug(),"Translating expression: ",<id>)
+ ;( TranslateGlobalVar
+  + TranslateStaticVar
+  + TranslateVar
+  + TranslateIndex(TranslateExp)
+  + TranslateField(TranslateExp)
+  + TranslateInt
+  + TranslateFloat
+  + TranslateBool
+  + TranslateUnOp(TranslateExp)
+  + TranslateBinOp(TranslateExp)
+  + TranslateRangeAsNDArray
+  + TranslateSubscript
+  + TranslateString
+  + TranslateBuiltinCall(|"1")
+  + TranslateMappingCall
+  + TranslateDldCall(TranslateExp)
+  + TranslateCall
+//  + TranslateComplex
+  + TranslateCommand
+  + TranslateBuiltinConstant
+  + TranslateMatrix(TranslateExp)
+  + TranslateMatrixDynamic(TranslateExp) 
+  + TranslateCell(TranslateExp)
+  + TranslateColon
+  ) //;debug(!"na:")
+ <+ fatal-error(|"Could not translate expression: ")
+
+
+  TranslateColon: Colon() -> c:exp |[ octave_magic_colon().empty_clone() ]|
+
+  TranslateField(exp) :
+    t@FieldVar(v,f) -> exp |[ ~exp:<exp>v .contents(~str:<double-quote>f)(0).y() ]|
+    where 
+      <octave-value-to-c-method>t => y
+
+  TranslateString :
+    String(cs) -> exp |[ ~str:<escape;double-quote>cs  ]|
+
+  TranslateGlobalVar:
+    Var(x) -> c:exp|[ get_global_value(~str:<double-quote>x) ]|
+    where 
+      is-global 
+
+   TranslateStaticVar:
+    Var(x) -> c:exp|[ x ]|
+    where 
+      is-static 
+
+  TranslateVar:
+    Var(x) -> c:exp|[ x ]|
+
+  TranslateBool :
+    True() -> c:exp |[ true ]|
+
+  TranslateBool :
+    False() -> c:exp |[ false ]|
+
+  TranslateCall :
+    Exp |[ x(a0*) ]| -> FunCall(Id(x), <map(TranslateExp)>a0* )
+
+
+  TranslateRange :
+    |[ (e0:e1:e2) ]| -> |[ Range(~exp:e3,~exp:e4,~exp:e5) ]|
+    where <map(octave-exp-to-float(TranslateExp))>[e0,e2,e1] => [e3,e4,e5]
+
+  TranslateRangeAsNDArray :
+    |[ (e0:e1:e2) ]| -> |[ Range(~exp:e3,~exp:e4,~exp:e5) ]|
+    where <map(octave-exp-to-float(TranslateExp))>[e0,e2,e1] => [e3,e4,e5]
+
+rules
+
+  TranslateBuiltinConstant =
+    \ Constant("Inf")          -> exp |[ lo_ieee_inf_value() ]| \
+  + \ Constant("inf")          -> exp |[ lo_ieee_inf_value() ]| \
+  + \ Constant("NA")           -> exp |[ lo_ieee_na_value() ]| \
+  + \ Constant("NaN")          -> exp |[ lo_ieee_nan_value() ]| \
+  + \ Constant("nan")          -> exp |[ lo_ieee_nan_value() ]| \
+  + \ Constant("e")            -> exp |[ exp(1.0) ]| \
+  + \ Constant("eps")          -> exp |[ DBL_EPSILON ]| \
+  + \ Constant("pi")           -> exp |[ 4.0 * atan(1.0) ]| \
+  + \ Constant("realmax")      -> exp |[ DBL_MAX ]| \
+  + \ Constant("realmin")      -> exp |[ DBL_MIN ]| \
+  + \ Constant("OCTAVE_HOME")  -> exp |[ Voctave_home ]| \
+  + \ Constant("filesep")      -> exp |[ ~id:"file_ops::dir_sep_str" ]| \
+  + \ Constant("program_name") -> exp |[ ~id:("octave_env::get_program_name") () ]| \
+  + \ Constant("i")            -> exp |[ Complex(0.0,1.0) ]| \
+  + \ Constant("OCTAVE_VERSION") -> exp |[ OCTAVE_VERSION ]| \
+
+
+// simple values
+rules
+
+  TranslateInt:
+    Int(x) -> c:exp|[ ~int:x ]|
+
+  TranslateFloat:
+    Float(x) -> c:exp|[ ~real:x ]|
+
+
+rules
+
+  list-to-ov-list(|x) =
+    where(length => i)
+  ; add-indices 
+  ; map(!stm |[ x (~int:<subt>(<Fst>,1) ) = octave_value(~exp:<Snd>) ;]| ) 
+  ; ![stm |[ x . resize(~int:<int-to-string>i ) ;]| |<id>]
+
+rules
+  TranslatePrint =
+    ?Print(n,<?lv>)
+  ; where(
+      <concat-strings>[n, " = "] => dn 
+    ; new => y
+    ; !"std::cout" => x
+    ; <TranslateExp>lv => e1
+    )
+  ; given-octave-value-type(
+      print-scalar(|lv,dn)
+    , print-matrix(|lv,dn)
+    , print-scalar(|lv,dn)
+    , print-matrix(|lv,dn)
+    , print-scalar(|lv,dn)
+    , print-matrix(|lv,dn)
+    , !stm |[ 
+           {
+             octave_value y ;
+             y = e1 ;
+             y.print_name_tag(x,~str:<double-quote>n); 
+             y.print(x);
+           }
+         ]|
+    , print-matrix(|lv,dn)
+    , print-scalar(|lv,dn)
+    ,  !stm |[ {
+              x << ~str:<double-quote>dn 
+                              << "\"\\n\\n\"" ;
+              octave_print_internal(x, e1.matrix_value());
+              x << "\"\\n\\n\"" ; 
+              } ]| 
+    , !stm |[ x << ~str:<double-quote>dn 
+                << "\"\\n\\n\"" 
+                << e1.matrix_value() 
+                << "\"\\n\"";             ]|
+    , !stm |[ 
+           { 
+             octave_value(e1).print_name_tag(x,~str:<double-quote>n); 
+             octave_value(e1).print(x);
+           }
+         ]|
+    , !stm |[ 
+           { 
+             octave_struct(e1).print_name_tag(x,~str:<double-quote>n); 
+             octave_struct(e1).print(x);
+           }
+         ]|
+    , !stm |[ 
+           { 
+             e1.print_name_tag(x,~str:<double-quote>n); 
+             e1.print(x);
+           }
+         ]|
+    )
+
+  print-scalar(|lv,dn) =
+    !stm |[ ~id:"std::cout" << ~str:<double-quote>dn << ~exp:<TranslateExp>lv << "\"\\n\"" ;             ]|
+
+  print-matrix(|lv,dn) =
+    where(
+      !"std::cout" => x
+    ) 
+  ; !stm |[ {
+              x << ~str:<double-quote>dn  << "\"\\n\\n\"" ;
+              octave_print_internal(x, ~exp:<TranslateExp>lv);
+              x << "\"\\n\\n\"" ; 
+              } ]| 
+
+

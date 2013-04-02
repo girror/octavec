@@ -1,0 +1,194 @@
+module Octave-Vectorize
+imports 
+  liblib 
+  liboctavec 
+  Octave-Collect-Statements 
+  Octave-Dependence 
+  Octave-Dependence-Testing 
+  Octave-Vectorize-Statement 
+strategies
+
+  io-Octave-Vectorize =    
+    octave-io-wrap(vectorize)    
+    
+  vectorize = 
+      alltd(vectorize-loop)
+   
+  vectorize-loop :   
+    org@|[ for x = e  do e1 end ]|  -> |[ {for x = e do {es2*} end; es3*} ]|
+    where  
+      {| UpperBound,IV,IsIV,IdToStat,HasDependence,HasMultipleMatrices,IsAssign,PossibleDependence: 
+           log(|Debug(),"Trying to vectorize for-loop",<id>)
+ 	 ; generate-info-rules 
+         ; <vectorize>e1  
+         ; if not(?e1) then 
+             log(|Debug(),"Vectorized body of for-loop",<id>) 
+           end
+	 ; standardize-input => es1* 
+         ; collect-statements 
+         ; determine-dependences 
+	 ; if contains(control) 
+	   then !(e1, []) 
+	   else filter(vectorizable(|x)) => vectorizable  
+              ; <partition({s: ?s; <fetch-elem(? (s,_))>vectorizable; 
+                                  normalize-subs(|x) ; vectorize-stat(|x) })> es1*  
+           end  
+	   => (es3*,es2*) 
+      |}
+
+  standardize-input = 
+     (remove-stats <+ is-list <+ make-list)
+   ; map(try(remove-stats))
+   ; flatten-list
+   
+  generate-info-rules =
+    ? |[ for x = e do e2 end ]|  
+    ; where(<? |[ (1:1:e1) ]|> e
+            ; <try(?|[ i ]|; <string-to-int> i)> e1 => j ) 
+    ; rules(  
+        IV         :+ _ -> x
+	IsIV       :  x
+        UpperBound :  x -> j 
+      )
+   
+  vectorizable(|x) =
+    ? (stat, statid)  
+    ; where( not(<HasDependence> statid) 
+           ; log(|Debug(),"Statement does not have a dependence, checking if it is vectorizable",<id>)
+
+           ; <normalize-subs(|x)> stat 
+           ; log(|Debug(),"Normalized subscripts",<id>)
+
+           ; no-iv-outside-subs(|x)
+	   ; only-mappings
+           ; (? |[ y[a1*] = e ]| <+ ? Silent(|[ y[a1*] = e ]|) )
+           ; if <? [_]> a1*
+             then vectorizable-single(|x)
+             else vectorizable-multiple(|x,statid)
+             end
+           ; log(|Debug(),"Statement is vectorizable",<id>)
+      )
+ 
+  vectorizable-single(|x) = 
+    (? |[ y[a1*] = e  ]| <+ ? Silent(|[ y[a1*] = e ]|))
+    ; where( <find-binops> |[ y[a1*] = e ]| => all-refs
+           ; <only-contains-var(|x)> a1*
+	   ; <map(\ |[ y[a1*] ]| -> a1* \)> all-refs
+	   ; if ?[] <+ ?[_]
+	     then only-contains-var(|x) <+ not-contains(? x)
+	     else map(only-contains-var(|x) <+ not-contains(? x))
+	     end
+    )
+    
+  vectorizable-multiple(|x,statid) = 
+    (? |[ y[a1*] = e  ]| <+ ? Silent(|[ y[a1*] = e ]|))
+    ; where ( <find-binops> |[ y[a1*] = e ]| => all-refs 
+     	    ; <number(id)> a1*
+	    ; filter(only-contains-var(|x) )
+	    ; ?[(i,j)]
+	    ; <map(\ |[ y[a1*] ]| -> a1* \)> all-refs => all-subs
+	    ; map({s: ?s; <index>(<add>(j,1),s)})
+	    ; map(only-contains-var(| x) <+ not-contains({x: ? |[ x ]|; <IsIV>x }))
+            ; <mapconcat(number(id))> all-subs
+	    ; filter(not(? (_,j)))
+	    ; not-contains(? x)
+	    ; check-dimensions
+      )
+  
+  check-dimensions = 
+    ? subs-list
+    ; collect-all(\ (_,a) -> a \)
+    ; map({s: ?s; <collect-all(\ (a,s) -> a \)>subs-list })
+    ; filter({a: ?a; <fetch-elem(is-range)>a; <fetch-elem(not(is-range))>a }) 
+    ; ?[]
+  
+  find-binops : 
+    |[ y[a1*] = e  ]| -> all-refs
+    where( <length> a1* => length-lhs
+         ; <get-all-subscripts> e => all-refs 
+         ; if not(?[] <+ ?[_])
+           then rules( HasMultipleMatrices : statid )
+           end
+         ; map(\ |[ y[a1*] ]| -> <length>a1* \)
+         ; filter( not(? length-lhs) )
+         ; ?[]
+    )
+    
+  control =
+    ?|[ break ]| 			    
+    <+ ?|[ continue ]|                      
+    <+ ?|[ return ]|                 
+
+  no-iv-outside-subs(|x) =
+    ? stat
+    ; where( get-all-subscripts
+           ; get-all-vars(|x) => sub-vars
+           ; <get-all-vars(|x)> stat
+           ; <?(sub-vars)><id>
+      )
+      
+  only-mappings =
+    where( collect-all(? Call(_,_))
+         ; filter(contains({x,a*: ? |[ x[a*] ]|}))
+         ; map({x: ? Call(Var(x),_); <is-mapping-function> x; not(no-mapping-function)})
+    )	 
+  
+
+// Some help strategies and rules:
+  no-mapping-function = 
+    ? "min" <+ ? "max"
+       
+  get-vars =
+    collect-all(\ Var(a) -> a \)
+
+  get-all-vars(|x) =
+   collect-all(? |[ x ]|, conc)
+    
+  only-contains-var(|x) = 
+    only-contains(Var(id), ?Var(x))
+
+  only-contains(select, pred) =
+      not(oncetd(select; not(pred)))
+    ; oncetd(select; pred)
+
+  contains-or-not(select, pred) =
+    topdown(if select then where((pred; !1 <+ !0) => y) end)
+
+  not-contains(pred) =
+    not(contains(pred))
+  
+  contains(pred) =
+    oncetd(pred)
+
+  equal-length =
+    (length, length); eq
+
+  multiple-occurrences =
+    ?[_,_|_]       
+    
+  is-assign = 
+     ?|[ lv = e ]|
+  <+ ?|[ [<multi:id>] = <id> ]|
+
+  contains-range = 
+    oncetd(is-range)
+      
+  is-range =
+    ? |[ (i:j:k) ]|
+  
+  remove-string =
+    alltd(string-to-int)
+
+  make-list :
+    e -> [e]
+
+  remove-stats :
+    Stats(e) -> e
+      
+  normalize-subs(|iv) =
+    alltd(subnorm(|iv))
+                                                                            
+  subnorm(|iv) :
+    |[ x[a1*] ]| -> |[ x[a2*] ]|
+    where <get-normalized-expression(| [iv])>a1* => a2*
+

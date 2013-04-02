@@ -1,0 +1,160 @@
+module Eval-Int-Expressions
+imports liblib Octave  
+strategies
+
+  io-Eval-Int-Expressions =  
+    io-wrap(evalExp)
+
+  evalExp = 
+    alltd(EvaluateStatements)
+  ; topdown(try(EvaluateUpper))
+
+rules
+
+  EvaluateStatements :    
+    |[ x = e ]| -> |[ x = e1 ]|
+    where <innermost(EvalBinOp)> e => e1
+  	
+  EvaluateUpper :
+   |[ for x = (1 : 1 : e1)  do e end]| ->   
+      |[ for x = (1 : 1 : e2) do e end ]|         
+   where <bottomup(try(EvalBinOp))> e1 => e2
+   
+// Swap
+
+   EvalBinOp :
+    BinOp(PLUS, Int(i), e) -> BinOp(PLUS, e, Int(i))
+    
+   EvalBinOp :
+    BinOp(MUL, Int(i), e) -> BinOp(MUL, e, Int(i))   
+    
+// Basic evaluations
+
+   EvalBinOp :
+    BinOp(MINUS, e, e) -> Int("0")
+   
+   EvalBinOp :
+    BinOp(MINUS, e, Int("0")) -> e
+   
+   EvalBinOp :
+    BinOp(MUL, Int("0"), e) -> Int("0")
+
+   EvalBinOp :
+    BinOp(MUL, e, Int("0")) -> Int("0")
+
+   EvalBinOp :
+    BinOp(PLUS, Int("0"), e) -> e
+
+   EvalBinOp :
+    BinOp(PLUS, e, Int("0")) -> e
+
+    EvalBinOp :
+    BinOp(MUL, e, Int("1")) -> e
+    
+   EvalBinOp :
+    BinOp(MUL, Int("1"), e) -> e
+    
+   EvalBinOp : 
+    BinOp(DIV, Int("0"), e) -> Int("0")
+
+   EvalBinOp :
+    BinOp(DIV, e, e) -> Int("1")
+    where <not("0")> e
+   
+   EvalBinOp :
+    BinOp(MINUS, BinOp(MINUS, Int("0"), Int(j)), e) -> 
+              BinOp(MINUS, BinOp(MINUS, Int("0"), e), Int(j))
+   EvalBinOp : 
+    BinOp(PLUS, BinOp(MINUS, Int("0"), Int(i)), e) -> 
+              BinOp(MINUS, e, Int(i)) 
+
+// Basic evaluations whithout DIV and MUL
+  
+   EvalBinOp:
+    BinOp(PLUS, BinOp(PLUS, e, Int(i)), Int(j)) ->  
+               BinOp(PLUS, e, Int(<addS>(i,j)))   
+      
+   EvalBinOp : 
+    BinOp(PLUS, Int(i), Int(j)) -> Int(<addS>(i,j))
+
+   EvalBinOp :
+    BinOp(MINUS, Int(i), Int(j)) -> Int(<subtS>(i,j))
+    where <gtS>(i,j)
+    
+   EvalBinOp :
+    BinOp(MINUS, Int(i), Int(j)) -> BinOp(MINUS, Int("0"), Int(<subtS>(j,i)))
+    where <ltS>(i,j)
+        ; <not("0")> i
+
+// Evaluations containing DIV and MUL
+
+   EvalBinOp :
+    BinOp(MUL, Int(i), Int(j)) -> Int(<mulS>(i,j))
+    
+   EvalBinOp :
+    BinOp(DIV, Int(i), Int(j)) -> Int(<divS>(i,j)) 
+    
+   EvalBinOp :
+    BinOp(PLUS, BinOp(MUL, e, Int(i)), BinOp(MUL, e, Int(j))) ->  
+               BinOp(MUL, e, Int(<addS>(i,j)))      
+
+   EvalBinOp :
+    BinOp(MINUS, BinOp(MUL, e, Int(i)), BinOp(MUL, e, Int(j))) ->
+               BinOp(MUL, e, Int(<subtS>(i,j)))
+    where <gtS>(i,j)
+
+   EvalBinOp :
+    BinOp(MINUS, BinOp(MUL, e, Int(i)), BinOp(MUL, e, Int(j))) ->
+               BinOp(MUL, e, BinOp(MINUS, Int("0"), Int(<subtS>(j,i))))
+    where <ltS>(i,j)
+
+// Eval rules
+
+   EvalBinOp:
+    BinOp(MINUS, BinOp(MINUS, Int(i), Int(j)), e) ->
+              BinOp(MINUS, BinOp(MINUS, Int("0"), Int(<subtS>(j,i))), e)
+   where <ltS>(i,j)
+       ; <not("0")> i
+
+   EvalBinOp:
+    BinOp(MINUS, BinOp(MINUS, Int(i), Int(j)), e) ->
+               BinOp(MINUS, Int("0"), e)
+    where <eq>(i,j)
+
+
+   EvalBinOp:
+    BinOp(MINUS, BinOp(PLUS, e, Int(i)), Int(j)) ->  
+              BinOp(PLUS, e, Int(<subtS>(i,j)))       
+    where <gtS>(i,j)    
+
+   EvalBinOp:
+    BinOp(MINUS, BinOp(PLUS, e, Int(i)), Int(j)) ->  
+               BinOp(MINUS, e, Int(<subtS>(j,i)))      
+    where <ltS>(i,j) 
+   
+   EvalBinOp:
+    BinOp(MINUS, BinOp(PLUS, e, Int(i)), Int(j)) ->  e  
+    where <eq>(i,j)  
+
+   EvalBinOp:
+    BinOp(MINUS, BinOp(MINUS, e, Int(i)), Int(j)) ->  
+               BinOp(MINUS, e, Int(<addS>(i,j)))   
+
+   EvalBinOp:
+    BinOp(PLUS, BinOp(MINUS, e, Int(i)), Int(j)) ->  
+               BinOp(MINUS, e, Int(<subtS>(i,j)))   	        
+    where <gtS>(i,j) 
+
+   EvalBinOp:
+    BinOp(PLUS, BinOp(MINUS, e, Int(i)), Int(j)) ->  
+               BinOp(PLUS, e, Int(<subtS>(j,i)))   	        
+    where <ltS>(i,j)
+
+   EvalBinOp:
+    BinOp(PLUS, BinOp(MINUS, e, Int(i)), Int(j)) ->  e   	        
+    where <eq>(i,j)
+
+   EvalBinOp:
+    BinOp(MUL, BinOp(MUL, e, Int(i)), Int(j)) ->  
+               BinOp(MUL, e, <mulS>(i,j))
+	            

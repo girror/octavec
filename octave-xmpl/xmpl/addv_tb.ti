@@ -1,0 +1,10 @@
+definitions
+
+
+functions
+ abs    :: scalar(int) -> scalar(int)
+
+
+variables
+ function addv(a, b, n) :
+   c :: matrix(int,dim(n,1))

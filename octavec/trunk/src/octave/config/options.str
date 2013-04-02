@@ -1,0 +1,39 @@
+module octave/config/options
+imports liblib
+
+strategies 
+
+  compiler-options =
+    Option("-c",
+      where(<set-config>("-c",())),
+      !"-c               Generate .cc only")
+  + Option("--tc",
+      where(<set-config>("--tc",())),
+      !"--tc             Do typechecking")
+  + Option("--opt",
+      where(<set-config>("--opt",())),
+      !"--opt            Do optimization")
+  + ArgOption("--opts",
+      where(<set-config>("--opt",<get-list-from-option>)),
+      !"--opts o1:o2:...  Perform optimization o1, o2 etc")
+  + ArgOption("--ppopts",
+      where(<set-config>("--ppopts",<get-list-from-option>)),
+      !"--ppopts o1:o2:...  Perform post processing optimization o1, o2 etc")
+  + Option("--varargout",
+      where(<set-config>("--varargout",())),
+      !"--varargout      Do optimization")
+  + Option("--script",
+      where(<set-config>("--script",())),
+      !"--script         Input is a script")
+  + Option("--dld",
+      where(<set-config>("--dld",())),
+      !"--dld            Generate .oct")
+  + ArgOption("--o2o",
+      where(<set-config>("--o2o",<id>)),
+      !"--o2o            Output Octave code")
+  + Option("--loop-opt",
+      where(<set-config>("--loop-opt",())),
+      !"--loop-opt       Use loop vectorization (experimental)")
+
+  get-list-from-option =
+   <string-tokenize>([':'],<id>)

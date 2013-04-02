@@ -1,0 +1,110 @@
+module Octave-Dependence
+imports 
+  liblib 
+  liboctavec
+  Octave-ZIV 
+  Octave-SIV 
+  Octave-MIV
+    
+strategies     
+
+  determine-dependences = 
+    where(
+      map((try(RemoveSilent),id))
+      ; compare-statements 
+    )
+       
+  compare-statements = 
+    where(
+      rec x( try(
+        \ [e|es] -> [<map(\e1 -> <try(find-dependence)>(e,e1)\)> | <x>es] \
+      ))
+    )
+  
+  find-dependence = 
+    ? ( (|[ e1 ]|, uid1), (|[ e2 ]|, uid2) )
+    ; <control-flow-check(|uid1,uid2)> (e1,e2)
+    ; try(<is-assign> e1; <test-assignment(|uid1,uid2)>(e1,e2))
+    ; try(<is-assign> e2; <test-assignment(|uid2,uid1)>(e2,e1))
+  
+  test-assignment(|uid1,uid2) =
+    ? (stat1,stat2)
+    ; if <? |[ lv = e ]|> stat1
+      then <get-var-used> lv
+         ; !(e,<id>)
+      else <? AssignMulti(vars,op,c)>stat1
+         ; !(c,<get-var-list>vars) 
+      end
+      => (exp,var-list)
+    ; if( <? uid1> uid2)
+      then <get-var-list> exp
+      else <get-var-list> stat2 
+      end
+    ; <isect>(<id>,var-list)
+    ; not(?[])
+    ; <check-possible-dependence> (uid1,stat1,uid2,stat2,var-list)
+  
+  get-var-used :
+    |[ x[a*] ]| -> [x]
+ 
+  get-var-used :
+    |[ x ]| -> [x]
+  
+  control-flow-check(|uid1,uid2) = 
+    ? (e1,e2)
+    ; try( <is-controlflow> e1; rules( HasDependence : uid1 ) )
+    ; try( <is-controlflow> e2; rules( HasDependence : uid2 ) )
+    
+  is-controlflow = 
+    ?|[ if e1 then e2 else e3 end ]|
+    <+ ?|[ while e1 do e2 end ]|
+    <+ ?|[ do e1 until e2 end ]|
+  
+  check-possible-dependence =
+    ? (uid1,stat1,uid2,stat2,varlist)
+    ; if  <?[x]> varlist
+        ; <?|[ x[a*] = e ]|> stat1 
+        ; <contains(? |[ x[a1*] ]|)> stat2
+      then <test-for-vectorizable> (uid1,stat1,uid2,stat2,x)
+      else add-dependence(|uid1,uid2)
+      end
+
+  test-for-vectorizable = 
+    ? (uid1,stat1,uid2,stat2,x)
+    ; <?|[ x[a*] = e ]|> stat1
+    ; if <?uid1>uid2
+      then 
+        log(|Debug(),["Testing for dependences '",stat1,"' on itself"])
+      ; <get-all-subscripts> e
+      ; get-subscripts(|x)
+      else 
+        log(|Debug(),["Testing for dependences between '",stat1,"' and '",stat2,"'"])
+      ; <get-subscripts(|x)> stat2
+      end
+    ; log(|Debug(),"Subscripts found: ",<id>)
+    ; if not(?[])
+      then 
+        map({a2*: ?|[ x[a2*] ]|
+              ; <classify-subscript-pairs>(uid1,a*,uid2,a2*)
+	      ; log(|Debug(),["Classified subscript '",a*,"' and '",a2*,"' as ",<id>])
+              ; <test-possible-dependence>(uid1,a*,uid2,a2*,<id>)
+           })
+      end
+  
+  get-subscripts(|x) =
+    collect-all({a*: ?|[ x[a1*] ]| })
+
+  get-all-subscripts =
+    collect-all({?|[ x[a*] ]|}, conc)
+
+  classify-subscript-pairs :
+    (uid1, index1, uid2, index2) -> class
+    where if <equal-length>(index1,index2) 
+          then 
+            <zip> (index1, index2)          
+            ; map( classify-ziv <+ classify-siv <+ classify-miv ) => class
+          else add-dependence(|uid1,uid2) 
+          end
+
+  get-var-list = 
+    collect-all(\ Var(x) -> x \)   

@@ -1,0 +1,7 @@
+module octave-global
+strategies
+
+
+  is-global =
+   (?Global(x) + ?GlobalInit(x,_))
+   ;where(<IsGlobal> Var(x) <+ rules(IsGlobal:Var(x)) )

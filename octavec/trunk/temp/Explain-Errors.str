@@ -1,0 +1,64 @@
+module Explain-Errors
+
+
+
+strategies
+
+  DontExplain =
+    debug(!"** type error in expression: ")
+
+rules
+
+
+//  Explain : exp@|[ e::ts bo e1::ts1 ]| -> exp
+  
+  //where  debug(!"Does it come here ");
+	//<printnl> (stderr,
+	//  ["** The operation ", bo, " cannot be executed \n"])
+
+  Explain : exp@ |[ e::ts1 / e1::ts2 ]| -> exp
+  where (<GetAType; |[complex]|> ts1 <+ <GetAType;|[complex]|> ts2)
+	//;<printnl>(stderr,
+	// ["** Division is not defined for complex numbers "])	
+
+  Explain :   exp@|[ e::matrix(t,dim(sh*)) * e1::matrix(t2,dim(sh1*)) ]| -> exp
+  where  !sh*  => [f1,c1]
+	; !sh1* => [f2,c2]
+	; <not(eq)> (c1,f2)
+	//; <printnl> (stderr,["** Error in matrices dimensions"])
+
+/** XXXXXXXXXXXX
+ // this should be called continue
+ Explain: 
+ |[ ro(e::ts, e1::ts1) ]| -> |[ ro(e::ts, e1::ts1) ]|
+  where  <not(eq)>(ts,ts1)
+	; <printnl> (stderr,["** Error in matrices dimensions"])
+*/
+        	
+//  Explain : exp@|[ ro(e::ts,e1::ts1)]| -> exp
+  /* where debug(!"Does it come here    ");
+	<printnl> (stderr, 
+           ["** The operation ",ro , " cannot be executed \n"
+	, "with " , ts, " and ", ts1])
+
+  */
+  
+
+ /* Explain-S : Assign(FieldVar(Var(v){tv},f){_},e{ts}){} -> ()
+  where (<not(RECORD)> tv;
+	 <printnl> (stderr, 
+	    ["** Variable ",v, " has type ",tv,
+		" cannot be redefined as record \n"])
+        )
+
+  Explain-S : Assign(Var(v){tv},e{ts}) -> ()
+  where (<not(eq)> (tv,t);
+	 <printnl> (stderr, 
+	    ["** Variable ",v, " has type ",tv,
+		" cannot be redefined as ",t ,"\n"])
+        )
+
+  Explain-S : Function(vars,f,args,body) -> FunctionDec(vars,f,args,body)
+  where (<printnl> (stderr, 
+	  [ "**  ",f," is a function  not a matlab program \n"])
+        )  */ 

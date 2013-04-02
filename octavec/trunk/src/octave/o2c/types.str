@@ -1,0 +1,257 @@
+module octave/o2c/types
+imports
+  C
+strategies
+  annotate-type(s) = !<id>{<s ; try(not(is-list) ; ![<id>])>}
+  octave-to-c-type = 
+    given-octave-value-type(
+      !type-spec |[ bool           ]|
+    , !type-spec |[ boolNDArray    ]|
+    , !type-spec |[ double         ]|
+    , !type-spec |[ NDArray        ]|
+    , !type-spec |[ double         ]|
+    , !type-spec |[ NDArray        ]|
+    , !type-spec |[ Complex        ]|
+    , !type-spec |[ ComplexNDArray ]|
+    , !type-spec |[ char           ]|
+    , !type-spec |[ ~type-spec:"std::string"    ]|
+    , !type-spec |[ Range          ]|
+    , !type-spec |[ Cell           ]|
+    , !type-spec |[ Octave_map     ]|
+    , !type-spec |[ octave_value   ]|
+    )
+
+  octave-value-to-c-method = 
+    given-octave-value-type(
+      !"bool_value"
+    , !"bool_array_value"
+    , !"int_value"
+    , !"array_value"
+    , !"double_value"
+    , !"array_value"
+    , !"complex_value"
+    , !"complex_array_value"
+    , !"char_value"
+    , !"char_array_value"
+    , !"range_value"
+    , !"cell_value"
+    , !"map_value"
+    , fail
+    )
+
+  octave-value-to-c-typespec = 
+    given-octave-value-type(
+      !"octave_bool"
+    , !"octave_bool_matrix"
+    , !"octave_scalar"
+    , !"octave_matrix"
+    , !"octave_scalar"
+    , !"octave_array"
+    , !"octave_complex"
+    , !"octave_complex_matrix"
+    , !"octave_value"
+    , !"octave_char_matrix"
+    , !"range_value"
+    , !"octave_cell"
+    , !"octave_struct"
+    , !"octave_value"
+    )
+
+
+  given-octave-value-type( bool-type, bool-matrix-type
+                         , int-type, int-matrix-type
+                         , float-type, float-matrix-type
+                         , complex-type, complex-matrix-type
+                         , char-type, char-matrix-type
+                         , range-type, cell-type
+                         , struct-type, octave-value-type) = 
+/*  try(annotate-type(infer-value-type)) */
+    ( where(get-octave-type ; is-bool-type)            ; bool-type
+    + where(get-octave-type ; is-bool-matrix-type)     ; bool-matrix-type
+    + where(get-octave-type ; is-int-type <+ Int(id))             ; int-type
+    + where(get-octave-type ; is-int-matrix-type)      ; int-matrix-type
+    + where(get-octave-type ; is-float-type <+ Float(id))           ; float-type
+    + where(get-octave-type ; is-float-matrix-type)    ; float-matrix-type
+    + where(get-octave-type ; is-complex-type)         ; complex-type
+    + where(get-octave-type ; is-complex-ndarray-type) ; complex-matrix-type
+    + where(get-octave-type ; is-char-type)            ; char-type
+    + where(get-octave-type ; is-char-matrix-type)     ; char-matrix-type
+    + where(get-octave-type ; is-range-type)           ; range-type
+    + where(get-octave-type ; is-cell-type)            ; cell-type
+    + where(get-octave-type ; is-struct-type)          ; struct-type
+    <+ octave-value-type
+    )
+
+
+
+rules
+
+ /**
+  * int
+  * bool
+  * float
+  * complex
+  * + matrices
+  * cell
+  * struct
+  * octave-value
+  */
+
+  octave-to-bool(s) :
+    Int(i) -> <s>True()
+      where <not(eq)>(i,"0")
+  octave-to-bool(s) :
+    Int(i) -> <s>False()
+      where <eq>(i,"0")
+  octave-to-bool(s) :
+    Float(i) -> <s>True()
+      where <not(eq)>(i,"0")
+  octave-to-bool(s) :
+    Float(i) -> <s>False()
+      where <eq>(i,"0")
+
+
+  cast-expression(s|tp) =
+    where(<is-int-type>tp)           ; octave-exp-to-int(s)
+  + where(<is-int-ndarray-type>tp)   ; octave-exp-to-int-ndarray(s)
+  + where(<is-bool-type>tp)          ; octave-exp-to-bool(s)
+  + where(<is-bool-ndarray-type>tp)  ; octave-exp-to-bool-ndarray(s)
+  + where(<is-float-type>tp)         ; octave-exp-to-float(s)
+  + where(<is-float-ndarray-type>tp) ; octave-exp-to-float-ndarray(s)
+  + where(<is-complex-type>tp)       ; octave-exp-to-complex(s)
+  + where(<is-octave-value-type>tp)  ; !exp |[ octave_value(~exp:<s>) ]|
+  + where(<is-unit-type>tp)          ; s
+ <+ try( where(<octave-value-to-c-method>(){tp} => f) ; !|[ octave_value(~exp:<s>).~id:(f) () ]|)
+ <+ <fatal-error>["Could not cast expression ",<id>," from ",<get-octave-type>," to ",tp]
+
+  octave-exp-to-int(s) =
+    Int(id); s 
+  <+ 
+    given-octave-value-type(
+      !exp |[ (int)~exp:<s>               ]|
+    , !exp |[ (int)(~exp:(<s>) (0))       ]|
+    , !exp |[ ~exp:<s>                    ]|
+    , !exp |[ ~exp:(<s>) (0)              ]|
+    , !exp |[ (int)~exp:<s>               ]|
+    , !exp |[ (int)(~exp:(<s>) (0))       ]|
+    , !exp |[ (int)~exp:<s>               ]|
+    , !exp |[ (int)(~exp:(<s>) (0))       ]|
+    , fail                                   //char
+    , fail
+    , !exp |[ ~exp:<s> .array_value()(0) ]|
+    , fail
+    , fail
+    , !exp |[ ~exp:<s> .int_value()       ]|
+    )
+
+  octave-exp-to-int-ndarray(s) =
+    given-octave-value-type(
+      fail
+    , fail
+    , <s>Matrix([[<id>]])
+    , s
+    , <s>Matrix([[<id>]])
+    , s
+    , fail
+    , fail
+    , fail                                   //char
+    , fail
+    , fail
+    , fail
+    , fail
+    , !exp |[ ~exp:<s> .array_value()       ]|
+    )
+
+  octave-exp-to-bool(s) = 
+    octave-to-bool(s)
+  + given-octave-value-type(
+      !exp |[ ~exp:<s>                                ]|
+    , !exp |[ ~exp:<s> .all().all()(0)                ]|
+    , !exp |[ ~exp:<s> != 0                           ]|
+    , !exp |[ ~exp:<s> .all().all()(0)                ]|
+    , !exp |[ ~exp:<s> != 0                           ]|
+    , !exp |[ ~exp:<s> .all().all()(0)                ]|
+    , !exp |[ ~exp:<s> != 0                           ]|
+    , !exp |[ ~exp:<s> .all().all()(0)                ]|
+    , fail                                   //char
+    , fail
+    , !exp |[ ~exp:<s> .array_value().all().all()(0) ]|
+    , fail
+    , fail
+    , !exp |[ octave_value(~exp:<s>) .is_true()  ]|
+    )
+ 
+  octave-exp-to-bool-ndarray(s) =
+    given-octave-value-type(
+      <s>Matrix([[<id>]])
+    , s
+    , fail
+    , fail
+    , fail
+    , fail
+    , fail
+    , fail
+    , fail                                   //char
+    , fail
+    , fail
+    , fail
+    , fail
+    , !exp |[ ~exp:<s> .bool_array_value()       ]|
+    )
+
+  
+  octave-exp-to-float(s) =
+    Float(id); s 
+  <+ 
+    given-octave-value-type(
+      !exp |[ (double)~exp:<s>            ]| //bool
+    , !exp |[ (double)~exp:<s> (0)        ]|
+    , !exp |[ (double)~exp:<s>            ]| //int
+    , !exp |[ (double)~exp:<s> (0)        ]|
+    , !exp |[ ~exp:<s>                    ]| //float
+    , !exp |[ ~exp:<s> (0)                ]|
+    , !exp |[ (int)~exp:<s>.real()        ]| //complex
+    , !exp |[ (int)~exp:<s> (0).real()    ]|
+    , fail                                   //char
+    , fail
+    , !exp |[ ~exp:<s> .matrix_value()(0) ]| //range
+    , fail                                   //cell
+    , fail                                   //struct
+    , !exp |[ ~exp:<s> .double_value()    ]| //octave_value
+    )
+
+  octave-exp-to-float-ndarray(s) =
+    given-octave-value-type(
+      fail
+    , fail
+    , <s>Matrix([[<id>]])
+    , s
+    , <s>Matrix([[<id>]])
+    , s
+    , fail
+    , fail
+    , fail                                   //char
+    , fail
+    , fail
+    , fail
+    , fail
+    , !exp |[ ~exp:<s> .array_value()       ]|
+    )
+
+  octave-exp-to-complex(s) =
+    given-octave-value-type(
+      !exp |[ Complex((double)~exp:<s>,0) ]| //bool
+    , fail
+    , !exp |[ Complex(~exp:<s>,0)         ]| //int
+    , fail
+    , !exp |[ Complex(~exp:<s>,0)         ]| //float
+    , fail
+    , !exp |[ ~exp:<s>                    ]| //complex
+    , fail
+    , fail                                   //char
+    , fail
+    , fail                                   //range
+    , fail                                   //cell
+    , fail                                   //struct
+    , !exp |[ ~exp:<s> .complex_value()   ]| //octave_value
+    )

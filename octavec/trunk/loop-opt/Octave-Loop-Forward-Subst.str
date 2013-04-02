@@ -1,0 +1,88 @@
+module Octave-Loop-Forward-Subst
+imports 
+  liblib 
+  liboctavec
+  Octave-ControlFlow
+strategies
+
+  io-Octave-Loop-Forward-Subst= 
+    io-wrap(forward-subst)
+
+  forward-subst = 
+     bottomup(try(FS-on-Loop))
+
+rules
+
+  FS-on-Loop:
+     |[ for x = (e1 : e2 : e3) do e4 end]| -> 
+	 |[ {for x = (e1 : e2 : e3) do e5 end; ~e*} ]|
+  where  <not-control-flow> |[ e4 ]|
+       ; <find-replace-fs(| |[ x ]|,|[e1]|,|[e3]| )> |[ e4 ]| => |[ e5 ]|
+       ; <bagof-PostAssign> |[ x ]| 
+       ; filter-Assignments => e*
+       
+  find-replace-fs(| iv,l,u) = 
+      (octave-flow(find-replace-fs(|iv,l,u))
+       <+ all(find-replace-fs(|iv,l,u)))
+    ; try(
+	  ForwardSubAsg(|iv,l,u) <+ FSubs
+      )       
+  
+  not-control-flow =
+    not(oncetd(?IfThen(_,_) + ?If(_,_,_) + ?While(_,_) ))     
+ 
+  ForwardSubAsg(| iv, l, u):
+   |[ x = e ]| -> |[ nil ]|
+   where
+       <try(killme)>|[ x ]|  
+//     ; <not-selfcontained> (|[ e ]|, |[ x ]|)	
+     ; rules(
+        FSubs : |[ x ]| -> |[ e ]|
+       )
+     ; create-killme-rules(| |[ x ]|, |[ e ]|)
+     ; <finalize-exp(| iv, l, u)>|[ e ]| => |[ e1 ]|
+     ; rules(
+        PostAssign :+ iv -> |[ x = e1 ]|          
+       )
+  
+  not-control-flow =
+    not(oncetd(?IfThen(_,_) + ?If(_,_,_) + ?While(_,_) ))      
+  
+  not-selfcontained =
+     ?(e, Var(x))
+      ;<not(oncetd(?Var(x)))> e
+    
+  killme =
+    bagof-KillMe
+    ; map({?x; rules( FSubs : |[ x ]| -> Undefined )}) 
+  
+  finalize-exp(|iv,l,u) =
+    try(  not(is-loop-invariant(|iv)) 
+       ; bottomup(try(?iv; !|[ (~u - ~l) + 1 ]|))
+      )
+
+  is-loop-invariant(|iv) =
+    where(not(oncetd(?iv)))
+    
+  create-killme-rules(|e1, e2) =
+    <get-vars> (e1,e2)
+    ; map({y : ?|[ y ]|
+           ; rules(
+               KillMe :+ |[ y ]| -> e1
+		        where <FSubs>  e1  => e2
+            )})
+
+  get-vars =
+    collect(Var(id))
+   
+  filter-Assignments = 
+    let 
+        i = !([],[])
+        s = {?( a@|[ x = e ]|, c@(a*,v* ))
+            ; if <elem>(x,v* )
+               then !c
+	       else !([a|a* ], [x|v* ])
+	      end}
+     in 
+        reverse; foldr(i,s); Fst
+    end 

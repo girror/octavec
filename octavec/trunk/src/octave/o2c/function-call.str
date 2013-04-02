@@ -1,0 +1,219 @@
+module octave/o2c/function-call
+
+rules
+
+  // merge with other?
+  TranslateBuiltinCall(|i) : 
+    t@Call(Var(n),ps) -> ne 
+        where 
+          <is-builtin-function>n 
+        ; <not(is-dld-function)>n
+        ; <not(is-mapping-function)>n 
+        ; <concat-strings>["F",n] => f
+        ; <newname>"ovlist" => x  
+        ; <map(TranslateExp)>ps 
+        ; list-to-ov-list(|x) => ovlist
+        ; rules( init-stats:+ _ -> dec* |[  octave_value_list x ;
+                                            ~dec*:ovlist
+                                        ]| ) 
+        ; <cast-expression(!exp |[ f(x,i)(0) ]| |<get-octave-type>t)>Call(Var(n),ps){UNIVERSAL()} => ne
+
+
+//  TranslateBuiltinCall = TranslateBuiltinCall(|0)
+
+
+  TranslateBuiltinCall : 
+    t@Call(Var(n),ps) -> exp |[ f (x , 0) ]|
+        where 
+          <is-builtin-function>n
+        ; <not(is-dld-function)>n
+        ; <concat-strings>["F",n] => f
+        ; <newname>"ovlist" => x 
+        ; <map(TranslateExp)>ps 
+        ; list-to-ov-list(|x) => ovlist
+        ; rules( init-stats:+ _ -> dec* |[  octave_value_list x ;
+                                            ~dec*:ovlist
+                                        ]| ) 
+
+  TranslateMappingCall : 
+    t@Call(Var(n),ps)
+      -> exp |[ Ffeval(x , 1)(0) ]|
+        where 
+          <is-mapping-function>n 
+        ; <newname>"ovlist" => x 
+        ; ![<string-to-octave-string;TranslateExp>n|<map(TranslateExp)>ps] 
+        ; list-to-ov-list(|x) => ovlist
+        ; rules( init-stats:+ _ -> dec* |[  octave_value_list x ;
+                                            ~dec*:ovlist
+                                        ]| ) 
+
+strategies
+
+  TranslateBuiltinCallAssignment(exp) =
+    ( ?Assign(tv@Var(v),"=",Call(Var(n),ps)) ; ![tv] => vs
+    + ?AssignMulti(vs,"=",Call(Var(n),ps)) )
+  ; <is-builtin-function>n 
+  ; <not(is-dld-function)>n
+  ; <length>vs => l
+  ; <concat-strings>["F",n] => f
+  ; <newname>"ovlist" => x 
+  ; <newname>"ovlist" => y
+  ; <map(exp)>ps 
+  ; list-to-ov-list(|x) => ovlist
+  ; <add-indices>vs
+  ; map({i,v,tp:
+       ?(i,v)
+     ; ( <get-octave-type>v => tp
+     ; not([]+UNIVERSAL())
+     ; <cast-expression(!exp |[ ( y (~int:<dec>i)) ]| |tp)>()
+    <+ !exp |[ y (~int:<dec>i) ]| )
+     ; if <is-global>v 
+        then
+        !stm |[ set_global_value(~id:<?Var(x); !Id(x)>v , ~exp:<id>) ; ]| 
+        else
+        !stm |[ ~id:<exp>v = ~exp:<id> ; ]|
+       end
+     }) => as
+  ; !stm |[
+       {
+         octave_value_list x ;
+         octave_value_list y ;
+         ~stm*:ovlist
+         y = f(x, ~int:l) ; 
+         ~stm*:as
+       }
+     ]|
+
+  TranslateBuiltinCallAssignment(exp) =
+    (  ?AssignMulti(vs,"=",Call(Var(n),ps)) )
+  ; <length>vs => l
+  ; <is-builtin-function>n
+  ; <not(is-dld-function)>n
+  ; <concat-strings>["F",n] => f
+  ; <newname>"ovlist" => x 
+  ; <newname>"ovlist" => y
+  ; <map(exp)>ps 
+  ; list-to-ov-list(|x) => ovlist
+  ; <add-indices>vs
+  ; map({i,v,tp:
+       ?(i,v)
+     ; ( <get-octave-type>v => tp
+     ; not([]+UNIVERSAL())
+     ; <cast-expression(!exp |[ ( y (~int:<dec>i)) ]| |tp)>() 
+    <+ !exp |[ y (~int:<dec>i) ]| )
+     ; !stm |[ ~id:<exp>v = ~exp:<id> ; ]|  
+     }) => as
+  ; !stm |[
+       {
+         octave_value_list x ;
+         octave_value_list y ;
+         ~stm*:ovlist
+         y = f (x , ~int:l) ;
+         ~stm*:as
+       }
+     ]|
+
+  TranslateBuiltinCallZeroOrOneAssignment(exp) =
+   ?s@Assign(Var(v),"=",Call(Var(n),ps))
+   ; <?"zeros" + ?"ones">n
+   ; <?[Int(r), Int(c)]>ps
+   ; <TranslateBuiltinCallAssignment(exp)>s
+   ; ?c-stmt
+   ; where(<string-to-int>r => rr; <string-to-int>c => cc)
+   ; rules(get-size: v -> (rr,cc)
+           InitVar:  Var(v) -> v
+          )
+
+
+  TranslateDldCall(exp) =
+    ?Call(Var(n),ps)
+  ; get-octave-type => tp
+  ; <is-dld-function>n
+  ; <not("rand")>n
+  ; <newname>"ovlist" => x
+  ; <map(TranslateExp)>ps 
+  ; list-to-ov-list(|x) => ovlist
+  ; <string-to-octave-string; exp>n=>e1
+  ; <(nargout <+ !1)>() => i
+  ; <cast-expression(!exp |[ feval(e1 , ~id:x, ~int:i)(0) ]| |tp)>()
+  ; rules( init-stats:+ _ -> dec* |[  octave_value_list x ;
+                                      ~dec*:ovlist
+                                  ]| )                                
+                                  
+
+  TranslateDldCall(exp) =
+   ?Call(Var("rand"),ps)
+   ; TranslateRand(exp) 
+
+
+ /* TranslateDldStatement(exp) =
+   ?Assign(Var(lv),"=",Call(Var("rand"),ps))
+  ; <TranslateVar> Var(lv) => v
+  ; rules(nargout: _ -> 1) 
+  ; <TranslateRand(exp)> Call(Var("rand"),ps)
+  ; !Stat(Assign(v,AssignEq(),<id>))
+  ; debug(!" Translate DLdStatement 1 \n") */
+  
+
+// XXXXXXXXXXXX rewrite!
+  TranslateDldStatement(exp) =
+    ( ?Assign(tv@Var(v),"=",Call(Var(n),ps)) ; ![tv] => vs
+    + ?AssignMulti(vs,"=",Call(Var(n),ps)) ) 
+  ; <is-dld-function>n 
+  ; <not("rand")>n
+  ; <length>vs => j
+  ; new => x 
+  ; new => y
+  ; <map(TranslateExp)>ps 
+  ; list-to-ov-list(|x) => ovlist
+  ; <add-indices>vs 
+  ; map({i,v,tp:
+       ?(i,v)
+     ; ( <get-octave-type>v => tp
+     ; not([]+UNIVERSAL())
+     ; <cast-expression(!exp |[ ( y (~int:<dec>i)) ]| |tp)>() 
+    <+ !exp |[ y (~int:<dec>i) ]| )
+     ; !stm |[ ~id:<exp>v = ~exp:<id> ; ]|  
+     }) => as
+  ; <string-to-octave-string;TranslateExp >n=>e1
+  ; !stm |[
+       {
+         octave_value_list x ;
+         octave_value_list y ;
+         ~stm*:ovlist
+         y = feval(~exp: e1,x,~int:j) ;
+         ~stm*:as
+       }
+     ]|
+
+
+rules
+
+  TranslateCommand :
+    Command(Var(cmd),ps) 
+      -> exp |[ f (y , 0) ]|
+    where 
+      <concat-strings>["F",cmd] => f
+    ; new => y
+    ; <add-indices>ps
+    ; map(!stm |[ ~id:(y) (~int:<Fst;dec>) = octave_value(~str:<Snd;double-quote>) ; ]|) => ovlist
+    ; !dec* |[ octave_value_list y ; ~dec*:ovlist ]| => stmts
+    ; rules( init-stats :+ _ -> stmts)
+
+
+// Translateion of DLD function calls
+
+  TranslateRand(expr):
+   |[ rand() ]| -> c:exp |[ octave_rand().scalar() ]|
+
+  TranslateRand(expr):
+   |[ rand(e1,e2) ]| -> exp |[ octave_rand().matrix(~exp: e3, ~exp: e4) ]|    
+   where  <get-c-scalar-value> e1 => e3
+	; <get-c-scalar-value> e2 => e4
+ 
+
+  get-c-scalar-value :
+   |[ i ]| -> exp|[ i ]|
+
+  get-c-scalar-value :
+   |[ x ]| -> exp|[ x.scalar_value() ]|

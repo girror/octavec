@@ -1,0 +1,150 @@
+module TC-Functions
+ 
+overlays
+   Cookie = MATRIX(BOOL,[Int("0"),Int("0")])
+   Scalar = [Int("1"),Int("1")]
+   Skip   = [SKIP,SKIP]
+
+strategies
+
+  DeclareFunctions(s) =
+    map( avoid-functions(s) <+ declare-func-recursive(s) <+ declare-func(s))   
+
+  avoid-functions(s) = 
+  ?fd@Function(r,f,a10*,e)
+  ; where(<GetTypeInfo <+ !Func(<id>,[],[],[],[])> f => Func(n,ns,vs,bis,tdef); check-avoid )
+  ; rules(
+	SpecializeCall(s) : 
+	 Call(Var(f),tyshes) ->  (f,ts)
+          where  !(Function(r,f,a10*,e),Func(n,ns,vs,bis,tdef) )
+	        ; <type-body(s|a10*,tyshes,r, tdef)> e => (a2*,e3, ts, r')
+	        ; rules(
+		  RetrieveSpecialization:+ Call(Var(f),tyshs2)-> (f,ts)
+		  where <check-strict-arguments-call(fail)>(tyshs2,tyshes)
+
+		  TypedFunction:+ () -> Function(r',f,a2*,e3)
+		  KeepTypeInfo:+ ()  -> Func(f,ns,vs,bis,tdef)
+		)
+               <+ <fatal-error> ["Could not type body of function ",f,"."]
+  )
+
+
+  declare-func(s) =
+    ?Function(r,h,a10*,e) 
+    ; <GetTypeInfo <+ !Func(<id>,[],[],[],[])> h => Func(n,ns,vs,bis,tdef)
+    ; rules(
+	SpecializeCall(s) : 
+	 Call(Var(h),tyshes) ->  (g,ts)
+          where <concat-strings> [h,"_",<new>] => g
+		; (<type-body(s|a10*,tyshes,r,tdef)>e => (a2*, e3, ts, r')
+ 	        ; ![h|ns] => fs
+	        ; rules(
+		   RetrieveSpecialization:+ Call(Var(h),tyshs2)-> (g,ts)
+		   where <check-strict-arguments-call(fail)>(tyshs2,tyshes)
+
+		   TypedFunction:+ () -> Function(r',g,a2*,e3) 
+		   KeepTypeInfo:+ ()  -> Func(g,fs,vs,bis,tdef)
+		 )
+               <+ <fatal-error> ["Could not type body of specialized function ",g," (",h,")."])
+      )
+
+  declare-func-recursive(s) =
+     ?fd@Function(_,h,_,e1)
+    ; where(<oncetd(?h)>e1)
+    ; rules(
+	SpecializeCall(s) : 
+	 Call(Var(h),tyshes) ->  (g,ts)
+          where <concat-strings> [h,"_",<new>] => g
+		; (<rename-rec-function(|h,g)> fd 
+		; ?(Function(r,f,a10*,e),Func(n,ns,vs,bis,tdef))
+		; <zip'(set-type-rule)>(a10*,tyshes)=>a2*
+	        ; <type-body-rec(|r,h,g,tdef)> e => (e3,ts,r')
+	        ; ![n|ns] => fs'
+	        ; rules(
+		   RetrieveSpecialization:+ Call(Var(h),tyshs2)-> (g,ts)
+		   where <eq>(tyshs2,tyshes)
+
+		   TypedFunction:+ () -> Function(r',g,a2*,e3)
+		   KeepTypeInfo:+ ()  -> Func(g,fs',vs,bis,tdef)  
+		 )
+               <+ <fatal-error> ["Could not type body of specialized function ",g," (",h,")..."])
+      )
+
+  rename-rec-function(|h,g) = 
+      where(<GetTypeInfo <+ !Func(<id>,[],[],[],[])> h => func => func')
+    ; where(<update-func-info>(func,func') => renamings)
+    ; Fst
+    ; Function(id,!g,id,id)
+    ; !(<id>, renamings)
+
+
+  update-func-info =
+  ?(Func(n,ns,vs,bs,ds), Func(n1,ns1,vs1,bs1,ds1))
+  ; where(<conc>(ns,ns1) => ns2; <conc>(vs,vs1) => vs2)
+  ; !Func(n,ns2,vs2,bs,ds)
+
+  type-body-rec(|r,f,g,ds) =
+    ?body
+   ; rules(
+	GiveCookie: Call(Var(f),tys) -> Call(Var(g),tys){Cookie}
+     )
+   ; eval-type-shape(GiveCookie)  
+   ; <type-ret-vars> r => (ts, r') 
+   ; rules(
+	GiveCookie: Call(Var(f),tys) -> Call(Var(g),tys){ts} 
+     ) 
+   ; <eval-type-shape(GiveCookie)> body => e
+   ; <type-ret-vars> r => (ts, r') 
+   ; !(e,ts,r')
+
+
+
+  type-body(s|a10*,tyshes,r,tdef) =
+     where(
+	<zip'(set-type-rule)>(a10*,tyshes)=>a2*
+	;<add-external-definitions> tdef
+      )
+    ; eval-type-shape(TcExternal) => e 
+    ; <map(tc-var <+ TcExternal <+ \x -> x{UNIVERSAL} \)>r 
+    ; !(<returning-types>, <id>) => (ts,r')
+    ; !(a2*, e,ts,r')
+
+  add-external-definitions =
+     ![VarTyped("_dummy_",SCALAR(INT))|<id>]
+   ; map(makeExternal)
+
+  makeExternal =
+   {x,ts:
+   ?VarTyped(x,ts) 
+   ;rules(
+     TcExternal: |[ x ]| -> |[ x::ts ]| 
+    )
+  }
+
+
+
+
+  type-ret-vars =
+     map(try(tc-var  <+ TcExternal <+ \x -> x{UNIVERSAL} \)) 
+   ; !(<returning-types>, <id>)
+
+  returning-types = 
+    map(extract-typeshape) // <+ \x -> UNIVERSAL where <not(has-annos)> x \ )
+   ; (?[<id>] <+ ?[] <+ id)
+
+
+  set-type-rule =
+    ?(x,ts) 
+  ; create-type-rule 
+  ; <rm-annotations;tc-var> x 
+ 
+  
+
+ rules
+
+
+ check-avoid =
+  ?Func(f, fs, vs, bs, t)
+  ; where(<get-config <+ ![]> "--avoid" => avoids)
+  ; <isect>(avoids,[f|fs]) 
+  ; not([]) 

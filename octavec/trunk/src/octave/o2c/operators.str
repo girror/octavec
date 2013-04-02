@@ -1,0 +1,817 @@
+module octave/o2c/operators
+
+strategies
+  match-binop-types(s1,s2) :
+    BinOp(e1,op,e2) -> (e1{ts1},e2{ts2})
+      where 
+        <get-octave-type>e1 => ts1
+      ; <get-octave-type>e2 => ts2
+      ; <try(?[<id>]) ; s1>ts1 ; <try(?[<id>]) ; s2>ts2 
+
+
+  match-binop-types(s1,s2,lhs,rhs) :
+    BinOp(e1,op,e2) -> (<lhs>e1{ts1},<rhs>e2{ts2})
+      where 
+        <get-octave-type>e1 => ts1
+      ; <get-octave-type>e2 => ts2
+      ; <try(?[<id>]) ; s1>ts1 ; <try(?[<id>]) ; s2>ts2 
+
+
+  match-binop-types(s1,s2,exp) = match-binop-types(s1,s2,exp,exp)
+
+  get-binop = ?BinOp(_,<id>,_)
+
+rules
+
+  generic-one-matrix(|e1,e2) =
+      \ |[ && ]| -> exp |[ mx_el_and(e1, e2) ]| \
+    + \ |[ || ]| -> exp |[ mx_el_or(e1, e2)  ]| \
+    + \ |[ == ]| -> exp |[ mx_el_eq(e1, e2)  ]| \
+    + \ |[ != ]| -> exp |[ mx_el_ne(e1, e2)  ]| \
+    + \ |[ <  ]| -> exp |[ mx_el_lt(e1, e2)  ]| \
+    + \ |[ <= ]| -> exp |[ mx_el_le(e1, e2)  ]| \
+    + \ |[ >  ]| -> exp |[ mx_el_gt(e1, e2)  ]| \
+    + \ |[ >= ]| -> exp |[ mx_el_ge(e1, e2)  ]| \
+
+
+  TranslateBinOp(exp)= 
+    binop-b-b(exp)
+  + binop-b-bm(exp)
+  + binop-bm-bm(exp)
+  + binop-c-c(exp) 
+  + binop-c-cm(exp) 
+  + binop-c-m(exp) 
+  + binop-cm-cm(exp) 
+  + binop-m-cm(exp) 
+  + binop-s-c(exp) 
+  + binop-s-s(exp)   
+  + binop-s-m(exp)   
+  + binop-m-m(exp)
+  + binop-ov-ov(exp) 
+  + binop-str-str(exp)   
+
+
+  TranslateBinOp(exp) :
+    Exp |[ e1 || e2 ]| -> exp |[ ~exp:<octave-exp-to-bool(exp)>e1 | ~exp:<octave-exp-to-bool(exp)>e2 ]| 
+
+  TranslateBinOp(exp) :
+    Exp |[ e1 && e2  ]| -> exp |[ ~exp:<octave-exp-to-bool(exp)>e1 & ~exp:<octave-exp-to-bool(exp)>e2 ]| 
+
+/**
+ * Unary operators for bool
+ */
+rules
+
+  o2c-prefix(type, rewrite) = 
+    where(
+      ?PrefixExp(_,<get-octave-type>) 
+    ; type 
+    )
+  ; rewrite
+
+  o2c-postfix(type, rewrite) = 
+    where(
+      ?PostfixExp(<get-octave-type>,_) 
+    ; type 
+    )
+  ; rewrite
+
+
+  TranslateUnOp(exp) =
+    o2c-prefix(
+      ?|[ bool ]|
+    , \ |[ !e  ]| -> exp |[ !e1 ]| where <exp>e => e1 \
+    + \ |[ e'  ]| -> <exp>e \
+    + \ |[ e.' ]| -> <exp>e \
+    )
+    
+
+/**
+ * Binary operators for bool 'op' bool
+ */
+rules
+
+  binop-b-b(exp) =
+    where( match-binop-types( is-bool-type,is-bool-type, exp) => (e1,e2) )
+  ; get-binop
+  ; ( \ |[ == ]| -> exp |[ e1 == e2 ]| \
+    + \ |[ != ]| -> exp |[ e1 != e2 ]| \
+    + \ |[  & ]| -> exp |[ e1  & e2 ]| \
+//    + \ |[ && ]| -> exp |[ e1  & e2 ]| \
+    + \ |[  | ]| -> exp |[ e1  | e2 ]| \
+//    + \ |[ || ]| -> exp |[ e1  | e2 ]| \
+    )
+
+
+/**
+ * Concat operators for bool 
+ */
+rules
+  
+
+/**
+ * Binary operators for bool 'op' bool-matrix, bool-matrix 'op' bool
+ */
+rules
+
+  binop-b-bm(exp) =
+    ?e
+  ; where( 
+      match-binop-types( is-bool-ndarray-type,is-bool-type, exp) => (e1,e2) 
+    + match-binop-types( is-bool-type,is-bool-ndarray-type, exp) => (e1,e2) 
+    )
+  ; get-binop
+  ; ( \ |[ && ]| -> exp |[ mx_el_and(e1, e2) ]| \
+    + \ |[ || ]| -> exp |[ mx_el_or(e1, e2)  ]| \
+    )
+
+
+/**
+ * Unary operators for bool-matrix 'op' bool-matrix
+ */
+rules
+
+  // Not
+  TranslateUnOp(exp) =
+    o2c-postfix(
+      is-bool-ndarray-type
+    , \  Exp |[ e'  ]| -> exp |[ e1.transpose() ]| where <exp>e => e1 \
+    + \  Exp |[ e.' ]| -> exp |[ e1.transpose() ]| where <exp>e => e1 \
+    )
+  + o2c-postfix(
+      is-bool-ndarray-type
+    , \ Exp |[ !e ]| -> exp |[ !e1 ]| where <exp>e => e1 \
+    )
+    
+/**
+ * Binary operators for bool-matrix 'op' bool-matrix
+ */
+rules
+
+  binop-bm-bm(exp) =
+    where( match-binop-types( is-bool-ndarray-type,is-bool-ndarray-type, exp) => (e1,e2) )
+  ; get-binop
+  ; ( \ |[ == ]| -> exp |[ mx_el_eq(e1, e2)  ]| \
+    + \ |[ != ]| -> exp |[ mx_el_ne(e1, e2)  ]| \
+    + \ |[ & ]|  -> exp |[ mx_el_and(e1, e2) ]| \
+    + \ |[ | ]|  -> exp |[ mx_el_or(e1, e2)  ]| \
+    + \ |[ +  ]| -> exp |[ e1 + e2           ]| \
+    + \ |[ -  ]| -> exp |[ e1 - e2           ]| \
+    )
+    
+  binop-bm-bm(exp) =
+    where( match-binop-types( is-bool-ndarray-type,is-bool-ndarray-type, cast-to-matrix(exp)) => (e1,e2) )
+  ; get-binop
+  ; ( \ |[ * ]|  -> exp |[ product(e1, e2)   ]| \
+    + \ |[ .* ]| -> exp |[ product(e1, e2)   ]| \
+    + \ |[ ./ ]| -> exp |[ quotient(e1, e2)  ]| \
+    + \ |[ .^ ]| -> exp |[ elem_xpow(e1, e2) ]| \
+    + \ |[ .\ ]| -> exp |[ quotient(e2, e1)  ]| \
+    + generic-one-matrix(|e1,e2)
+    )
+
+
+/**
+ * Unary operators for cells
+ */
+rules
+
+  // Transpose
+  TranslateUnOp(exp) :
+    Exp |[ e' ]| -> <exp>e
+    where <get-octave-type> e => |[ cell {ct*} ]|
+
+/**
+ * Unary operators for char-matrix
+ */
+rules
+
+  // Transpose
+  TranslateUnOp(exp) =
+    o2c-postfix(
+      is-char-ndarray-type
+    , \ |[ e'  ]|  -> |[ e1.transpose() ]| where <exp>e => e1 \ 
+    + \ |[ e.' ]|  -> |[ e1.transpose() ]| where <exp>e => e1 \
+    )
+  
+
+/**
+ * Unary operators for complex-matrix
+ */
+rules
+
+  TranslateUnOp(exp) =
+    o2c-postfix(
+      is-complex-ndarray-type
+    , \ |[ e'  ]|  -> <exp> Exp |[ feval("conj", e) ]| \ 
+    + \ |[ e.' ]|  -> |[ e1.transpose() ]| where <exp>e => e1 \
+    )
+ 
+
+/**
+ * Binary operators for complex-matrix 'op' complex-matrix
+ */
+rules
+
+  binop-cm-cm(exp) =
+    where( match-binop-types(is-complex-ndarray-type,is-complex-ndarray-type, exp) => (e1,e2) )
+  ; get-binop
+  ; ( \ |[ +  ]| -> exp |[ e1 + e2          ]| \
+    + \ |[ -  ]| -> exp |[ e1 - e2          ]| \
+    + \ |[ .\ ]| -> exp |[ quotient(e1, e2) ]| \
+    + generic-one-matrix(|e1,e2)
+    )
+
+
+  binop-cm-cm(exp) =
+    let cast2cm = cast-to-complex-matrix(exp)
+    in
+      where( match-binop-types(is-complex-ndarray-type,is-complex-ndarray-type, cast2cm) => (e1,e2) )
+    ; get-binop
+    ; ( \ |[ *  ]| -> exp |[ e1 * e2           ]| \
+      + \ |[ .* ]| -> exp |[ product(e1, e2)   ]| \
+      + \ |[ /  ]| -> exp |[ xdiv(e1, e2)      ]| \
+      + \ |[ ./ ]| -> exp |[ quotient(e1, e2)  ]| \
+      + \ |[ .^ ]| -> exp |[ elem_xpow(e1, e2) ]| \
+      + \ |[ \  ]| -> exp |[ xleftdiv(e1, e2)  ]| \
+      )
+    end
+
+/**
+ * Binary operators for complex-matrix 'op' complex
+ */
+rules
+
+  binop-c-cm(exp) =
+    where( 
+      match-binop-types(is-complex-ndarray-type,is-complex-type, exp) => (e1,e2) 
+    + match-binop-types(is-complex-type,is-complex-ndarray-type, exp) => (e1,e2) 
+    )
+  ; get-binop
+  ; ( \ |[ +  ]| -> exp |[ e1 + e2 ]| \
+    + \ |[ -  ]| -> exp |[ e1 - e2 ]| \
+    + \ |[ *  ]| -> exp |[ e1 * e2 ]| \
+    + \ |[ .* ]| -> exp |[ e1 * e2 ]| \
+    + generic-one-matrix(|e1,e2)
+    )
+
+  binop-c-cm(exp) =
+    where( 
+      match-binop-types(is-complex-ndarray-type,is-complex-type, cast-to-complex-matrix(exp), exp) => (e1,e2) 
+    )
+  ; get-binop
+  ; ( \ |[ ^  ]| -> exp |[ xpow(e1, e2 )      ]| \
+    + \ |[ .^ ]| -> exp |[ elem_xpow(e1, e2 ) ]| \
+    + \ |[ \  ]| -> exp |[ xleftdiv(e1, e2 )  ]| \
+    )
+
+  binop-c-cm(exp) =
+    where(match-binop-types(is-complex-ndarray-type,is-complex-type,exp) => (e1,e2) )
+  ; get-binop
+  ; ( \ |[ /  ]| -> exp |[ e1 / e2 ]| \
+    + \ |[ ./ ]| -> exp |[ e1 / e2 ]| \
+    )
+
+  binop-c-cm(exp) =
+    where( 
+      match-binop-types(is-complex-type,is-complex-ndarray-type, exp, cast-to-complex-matrix(exp)) => (e1,e2) 
+    )
+  ; get-binop
+  ; ( \ |[ ^  ]| -> exp |[ xpow(e1, e2 )      ]| \
+    + \ |[ .^ ]| -> exp |[ elem_xpow(e1, e2 ) ]| \
+    + \ |[ \  ]| -> exp |[ xleftdiv(e1, e2 )  ]| \
+    )
+
+  binop-c-cm(exp) =
+    where( 
+      match-binop-types(is-complex-type,is-complex-ndarray-type, exp) => (e1,e2) 
+    )
+  ; get-binop
+  ; \ |[ ./ ]| -> exp |[ e2 / e1 ]| \
+
+  binop-c-cm(exp) =
+    where( 
+      match-binop-types(is-complex-type,is-complex-ndarray-type, cast-to-complex-matrix(exp)) => (e1,e2) 
+    )
+  ; get-binop
+  ; \ |[ /  ]| -> exp |[ xdiv(e1, e2) ]| \
+
+
+/**
+ * Binary operators for complex-matrix 'op' float/int-matrix
+ */ 
+rules
+
+  binop-m-cm(exp) =
+    where( 
+      match-binop-types(is-complex-ndarray-type,is-float-ndarray-type, exp) => (e1,e2) 
+    + match-binop-types(is-float-ndarray-type,is-complex-ndarray-type, exp) => (e1,e2) 
+    + match-binop-types(is-complex-ndarray-type,is-int-ndarray-type, exp) => (e1,e2) 
+    + match-binop-types(is-int-ndarray-type,is-complex-ndarray-type, exp) => (e1,e2) 
+    )
+  ; get-binop
+  ; ( \ |[ +  ]| -> exp |[ e1 + e2           ]| \
+    + \ |[ -  ]| -> exp |[ e1 - e2           ]| \
+    + \ |[ *  ]| -> exp |[ e1 * e2           ]| \
+    + \ |[ .* ]| -> exp |[ product(e1, e2)   ]| \
+    + \ |[ .^ ]| -> exp |[ elem_xpow(e1, e2) ]| \
+    + \ |[ ./ ]| -> exp |[ quotient(e1, e2)  ]| \
+    + generic-one-matrix(|e1,e2)
+    )
+
+  binop-m-cm(exp) =
+    where( 
+      match-binop-types(is-float-ndarray-type,is-complex-ndarray-type, cast-to-matrix(exp), cast-to-complex-matrix(exp)) => (e1,e2) 
+    + match-binop-types(is-int-ndarray-type,is-complex-ndarray-type, cast-to-matrix(exp), cast-to-complex-matrix(exp)) => (e1,e2) 
+    )
+  ; get-binop
+  ; ( \ |[ /  ]| -> exp |[ xdiv(e1, e2)     ]| \
+    + \ |[ \  ]| -> exp |[ xleftdiv(e1, e2) ]| \
+    )
+
+  binop-m-cm(exp) =
+    where( 
+      match-binop-types(is-complex-ndarray-type,is-float-ndarray-type, cast-to-complex-matrix(exp), cast-to-matrix(exp)) => (e1,e2) 
+    + match-binop-types(is-complex-ndarray-type,is-int-ndarray-type, cast-to-complex-matrix(exp), cast-to-matrix(exp)) => (e1,e2) 
+    )
+  ; get-binop
+  ; ( \ |[ /  ]| -> exp |[ xdiv(e1, e2)     ]| \
+    + \ |[ \  ]| -> exp |[ xleftdiv(e1, e2) ]| \
+    )
+
+
+/**
+ *  Binary operators for complex-matrix 'op' scalars 
+ */
+rules
+  
+
+
+/**
+ * Unary/Binary operators for complex 'op' complex
+ */
+rules
+ 
+  TranslateUnOp(exp) =
+    o2c-prefix(
+      is-complex-type
+    , \ Exp |[ !e ]| -> exp |[ e1 == 0.0 ]| where <exp>e => e1 \
+    + \ Exp |[ -e ]| -> exp |[ -e1 ]| where <exp>e => e1 \
+    )
+  + o2c-postfix(
+      is-complex-type
+    , \ Exp |[ e' ]| -> exp |[ e1.transpose() ]| where <exp>e => e1 \
+    + \ Exp |[ e.' ]| -> <exp> Exp |[ feval("conj",e) ]| \
+    )
+						    
+
+  binop-c-c(exp) =
+    where( match-binop-types(is-complex-type,is-complex-type,exp) => (e1,e2) )
+  ; get-binop
+  ; ( \ |[ +  ]| -> exp |[ e1 + e2        ]| \
+    + \ |[ -  ]| -> exp |[ e1 - e2        ]| \
+    + \ |[ *  ]| -> exp |[ e1 * e2        ]| \
+    + \ |[ .* ]| -> exp |[ e1 * e2        ]| \
+    + \ |[ /  ]| -> exp |[ e1 / e2        ]| \
+    + \ |[ ./ ]| -> exp |[ e1 / e2        ]| \
+    + \ |[ .^ ]| -> exp |[ xpow(e1, e2)   ]| \
+    + \ |[ \  ]| -> exp |[ e2 / e1        ]| \
+    + \ |[ .\ ]| -> exp |[ e2 / e1        ]| \
+    + \ |[ == ]| -> exp |[ e1 == e2       ]| \
+    + \ |[ != ]| -> exp |[ real(e1 != e2) ]| \
+    + \ |[ <  ]| -> exp |[ real(e1 < e2)  ]| \
+    + \ |[ <= ]| -> exp |[ real(e1 <= e2) ]| \
+    + \ |[ >  ]| -> exp |[ real(e1 > 2)   ]| \
+    + \ |[ >= ]| -> exp |[ real(e1 >= e2) ]| \
+    )
+
+
+
+
+/**
+ *  Binary operators for complex 'op' matrix
+ */
+rules
+
+  binop-c-m(exp) =
+    where( 
+      match-binop-types( is-float-ndarray-type,is-complex-type) => (e1,e2) 
+    + match-binop-types( is-int-ndarray-type,is-complex-type) => (e1,e2) 
+    )
+  ; get-binop
+  ; ( \ |[ +  ]| -> exp |[ e1 + e2           ]| \
+    + \ |[ -  ]| -> exp |[ e1 - e2           ]| \
+    + \ |[ *  ]| -> exp |[ e1 * e2           ]| \
+    + \ |[ .* ]| -> exp |[ e1 * e2           ]| \
+    + \ |[ /  ]| -> exp |[ e1 / e2           ]| \
+    + \ |[ ./ ]| -> exp |[ e1 / e2           ]| \
+    + \ |[ ^  ]| -> exp |[ xpow(e1, e2)      ]| \
+    + \ |[ .^ ]| -> exp |[ elem_xpow(e1, e2) ]| \
+    + \ |[ .\ ]| -> exp |[ x_el_div(e2, e1)  ]| \
+    + generic-one-matrix(|e1,e2)
+    )
+
+  binop-c-m(exp) =
+    where( 
+      match-binop-types( is-float-ndarray-type,is-complex-type, cast-to-matrix(exp), exp) => (e1,e2) 
+    + match-binop-types( is-int-ndarray-type,is-complex-type, cast-to-matrix(exp), exp) => (e1,e2) 
+    )
+  ; get-binop
+  ; \ |[ \  ]| -> exp |[ xleftdiv(e1, e2) ]| \ 
+
+  binop-c-m(exp) =
+    where( 
+      match-binop-types( is-complex-type,is-float-ndarray-type, exp) => (e1,e2) 
+    + match-binop-types( is-complex-type,is-int-ndarray-type, exp) => (e1,e2) 
+    )
+  ; get-binop
+  ; ( \ |[ +  ]| -> exp |[ e1 + e2           ]| \
+    + \ |[ -  ]| -> exp |[ e1 - e2           ]| \
+    + \ |[ *  ]| -> exp |[ e1 * e2           ]| \
+    + \ |[ .* ]| -> exp |[ e1 * e2           ]| \
+    + \ |[ ./ ]| -> exp |[ x_el_div(e1, e2)  ]| \
+    + \ |[ ^  ]| -> exp |[ xpow(e1, e2)      ]| \
+    + \ |[ .^ ]| -> exp |[ elem_xpow(e1, e2) ]| \
+    + \ |[ \  ]| -> exp |[ e1 / e2           ]| \
+    + \ |[ .\ ]| -> exp |[ e2 / e1           ]| \
+    + generic-one-matrix(|e1,e2)
+    )
+
+  binop-c-m(exp) =
+    where( 
+      match-binop-types( is-complex-type,is-float-ndarray-type, cast-to-complex-matrix(exp), cast-to-matrix(exp)) => (e1,e2) 
+    + match-binop-types( is-complex-type,is-int-ndarray-type, cast-to-complex-matrix(exp), cast-to-matrix(exp)) => (e1,e2) 
+    )
+  ; get-binop
+  ; \ |[ /  ]| -> exp |[ xdiv(e1, e2) ]| \
+
+/**
+ *  Binary operators for complex 'op' scalars 
+ */
+rules
+
+  binop-s-c(exp) =
+    where( 
+      match-binop-types( is-complex-type,is-scalar-type, exp) => (e1,e2) 
+    + match-binop-types( is-scalar-type, is-complex-type, exp) => (e1,e2) 
+    )
+  ; get-binop
+  ; ( 
+      \ |[ ./ ]| -> exp |[ x_el_div(e1, e2) ]| \
+    + \ |[ ^  ]| -> exp |[ xpow(e1, e2 )    ]| \
+    + \ |[ .^ ]| -> exp |[ xpow(e1, e2 )    ]| \
+    )
+
+  binop-s-c(exp) =
+    where( 
+      match-binop-types( is-complex-type,is-scalar-type, exp, cast-expression(exp|tp|[ float ]|)) => (e1,e2) 
+    )
+  ; get-binop
+  ; ( \ |[ +  ]| -> exp |[ e1 + e2  ]| \
+    + \ |[ -  ]| -> exp |[ e1 - e2  ]| \
+    + \ |[ *  ]| -> exp |[ e1 * e2  ]| \
+    + \ |[ .* ]| -> exp |[ e1 * e2  ]| \
+    + \ |[ /  ]| -> exp |[ e1 / e2  ]| \
+    + \ |[ \  ]| -> exp |[ e1 / e2  ]| \
+    + \ |[ .\ ]| -> exp |[ e2 / e1  ]| \
+    + \ |[ == ]| -> exp |[ e1 == e2 ]| \
+
+    + \ |[ != ]| -> exp |[ real(e1) != e2 ]| \
+    + \ |[ <  ]| -> exp |[ real(e1) < e2  ]| \
+    + \ |[ <= ]| -> exp |[ real(e1) <= e2 ]| \
+    + \ |[ >  ]| -> exp |[ real(e1) > e2  ]| \
+    + \ |[ >= ]| -> exp |[ real(e1) >= e2 ]| \
+    )
+
+
+  binop-s-c(exp) =
+    where( 
+      match-binop-types( is-scalar-type, is-complex-type, cast-expression(exp|tp|[ float ]|), exp) => (e1,e2) 
+    )
+  ; get-binop
+  ; ( \ |[ +  ]| -> exp |[ e1 + e2  ]| \
+    + \ |[ -  ]| -> exp |[ e1 - e2  ]| \
+    + \ |[ *  ]| -> exp |[ e1 * e2  ]| \
+    + \ |[ .* ]| -> exp |[ e1 * e2  ]| \
+    + \ |[ /  ]| -> exp |[ e1 / e2  ]| \
+    + \ |[ \  ]| -> exp |[ e1 / e2  ]| \
+    + \ |[ .\ ]| -> exp |[ e2 / e1  ]| \
+    + \ |[ == ]| -> exp |[ e1 == e2 ]| \
+    )
+
+
+   binop-s-c(exp) =
+    where( 
+      match-binop-types( is-scalar-type, is-complex-type, exp) => (e1,e2) 
+    )
+  ; get-binop
+  ; ( \ |[ != ]| -> exp |[ e1 != real(e2)     ]| \
+    + \ |[ <  ]| -> exp |[ e1 < real(e2)      ]| \
+    + \ |[ <= ]| -> exp |[ e1 <= real(e2)     ]| \
+    + \ |[ >  ]| -> exp |[ e1 > real(e2)      ]| \
+    + \ |[ >= ]| -> exp |[ e1 >= real(e2)     ]| \
+    )
+ //    + \ |[ && ]| -> exp |[ e1 & (e2 != 0.0) ]| \
+ //    + \ |[ || ]| -> exp |[ e1 | (e2 != 0.0) ]| \
+ 
+
+/**
+ *  Binary operators for matrix 'op' matrix
+ */
+rules
+
+
+  TranslateUnOp(exp) =
+    o2c-postfix(
+      is-int-ndarray-type
+    + is-float-ndarray-type
+    , \ Exp |[ e'  ]| -> exp |[ e1.transpose() ]| where <exp>e => e1 \
+    + \ Exp |[ e.' ]| -> exp |[ e1.transpose() ]| where <exp>e => e1 \
+    )
+  + o2c-prefix(
+      is-int-ndarray-type
+    + is-float-ndarray-type
+    , \ Exp |[ -e ]| -> exp |[ -e1 ]| where <exp>e => e1 \
+    ) 
+
+  binop-m-m(exp) =
+    where( 
+      match-binop-types( is-float-ndarray-type,is-float-ndarray-type, exp) => (e1,e2) 
+    + match-binop-types( is-int-ndarray-type,is-float-ndarray-type, exp) => (e1,e2) 
+    + match-binop-types( is-float-ndarray-type,is-int-ndarray-type, exp) => (e1,e2) 
+    + match-binop-types( is-int-ndarray-type,is-int-ndarray-type, exp) => (e1,e2) 
+    )
+  ; get-binop
+  ; ( \ |[ +  ]| -> exp |[ e1 + e2           ]| \
+    + \ |[ -  ]| -> exp |[ e1 - e2           ]| \
+    + \ |[ .* ]| -> exp |[ product(e1, e2)   ]| \
+    + \ |[ ./ ]| -> exp |[ quotient(e1, e2)  ]| \
+    + \ |[ .^ ]| -> exp |[ elem_xpow(e1, e2) ]| \
+    + \ |[ .\ ]| -> exp |[ quotient(e2, e1)  ]| \
+    + generic-one-matrix(|e1,e2)
+    )
+
+  binop-m-m(exp) =
+    where( 
+      match-binop-types( is-float-ndarray-type,is-float-ndarray-type, cast-to-matrix(exp)) => (e1,e2) 
+    + match-binop-types( is-int-ndarray-type,is-float-ndarray-type, cast-to-matrix(exp)) => (e1,e2) 
+    + match-binop-types( is-float-ndarray-type,is-int-ndarray-type, cast-to-matrix(exp)) => (e1,e2) 
+    + match-binop-types( is-int-ndarray-type,is-int-ndarray-type, cast-to-matrix(exp)) => (e1,e2) 
+    )
+  ; get-binop
+  ; ( \ |[ *  ]| -> exp |[ e1 * e2         ]| \
+    + \ |[ /  ]| -> exp |[ xdiv(e1,e2)     ]| \
+    + \ |[ \  ]| -> exp |[ xleftdiv(e1,e2) ]| \
+    )
+
+/**
+ *  Binary operators for range
+ */
+rules
+
+
+
+
+/**
+ *  Binary operators for scalar 'op' scalar
+ */
+rules
+
+  TranslateUnOp(exp) =
+    o2c-prefix(
+      is-int-type
+    + is-float-type
+    , \ Exp |[ !e ]| -> exp |[ !e1 ]| where <exp>e => e1 \
+    + \ Exp |[ -e ]| -> exp |[ -e1 ]| where <exp>e => e1 \
+    )
+  + o2c-postfix(
+      is-int-type
+    + is-float-type
+    , \ Exp |[ e' ]| -> <exp>e \ 
+    + \ Exp |[ e.' ]| -> <exp>e \
+    )
+
+  binop-s-s(exp) =
+    where(match-binop-types(is-scalar-type,is-scalar-type, exp) => (e1,e2)) 
+  ; get-binop
+  ; ( \ |[ +  ]| -> exp |[ e1 + e2       ]| \
+    + \ |[ -  ]| -> exp |[ e1 - e2       ]| \
+    + \ |[ *  ]| -> exp |[ e1 * e2       ]| \
+    + \ |[ .* ]| -> exp |[ e1 * e2       ]| \
+    + \ |[ /  ]| -> exp |[ e1 / e2       ]| \
+    + \ |[ ./ ]| -> exp |[ e1 / e2       ]| \
+    + \ |[ ^  ]| -> exp |[ xpow(e1, e2)  ]| \
+    + \ |[ .^ ]| -> exp |[ xpow(e1, e2 ) ]| \
+    + \ |[ \  ]| -> exp |[ e2 / e1       ]| \
+    + \ |[ .\ ]| -> exp |[ e2 / e1       ]| \
+
+//    + \ |[ && ]| -> exp |[ e1 & e2   ]| \
+//    + \ |[ || ]| -> exp |[ e1 || e2   ]| \
+    + \ |[ == ]| -> exp |[ e1 == e2   ]| \
+    + \ |[ != ]| -> exp |[ e1 != e2   ]| \
+    + \ |[ <  ]| -> exp |[ e1 <  e2   ]| \
+    + \ |[ <= ]| -> exp |[ e1 <= e2   ]| \
+    + \ |[ >  ]| -> exp |[ e1 > e2    ]| \
+    + \ |[ >= ]| -> exp |[ e1 >= e2   ]| \
+    )
+
+/**
+ *  Binary operators for scalar 'op' matrix
+ */
+rules
+
+  binop-s-m(exp) =
+    where( 
+      match-binop-types( is-scalar-type,is-float-ndarray-type, exp) => (e1,e2) 
+    + match-binop-types( is-scalar-type,is-int-ndarray-type, exp) => (e1,e2) 
+    + match-binop-types( is-scalar-type,is-bool-ndarray-type, exp, cast-to-matrix(exp)) => (e1,e2)
+    )
+  ; get-binop
+  ; ( \ |[ +  ]| -> exp |[ e1 + e2           ]| \
+    + \ |[ -  ]| -> exp |[ e1 - e2           ]| \
+    + \ |[ *  ]| -> exp |[ e1 * e2           ]| \
+    + \ |[ .* ]| -> exp |[ e1 * e2           ]| \
+    + \ |[ ./ ]| -> exp |[ x_el_div(e1, e2)  ]| \
+    + \ |[ ^  ]| -> exp |[ xpow(e1, e2)      ]| \
+    + \ |[ .^ ]| -> exp |[ elem_xpow(e1, e2) ]| \
+    + \ |[ \  ]| -> exp |[ e2 / e1           ]| \
+    + \ |[ .\ ]| -> exp |[ e2 / e1           ]| \
+    + generic-one-matrix(|e1,e2)
+    )
+
+  binop-s-m(exp) =
+    where( 
+      match-binop-types( is-scalar-type,is-float-ndarray-type, cast-to-matrix(exp)) => (e1,e2) 
+    + match-binop-types( is-scalar-type,is-int-ndarray-type, cast-to-matrix(exp)) => (e1,e2) 
+    + match-binop-types( is-scalar-type,is-bool-ndarray-type, cast-to-matrix(exp)) => (e1,e2)
+    )
+  ; get-binop
+  ; \ |[ /  ]| -> exp |[ xdiv(e1, e2) ]| \
+
+  binop-s-m(exp) =
+    where( 
+      match-binop-types( is-float-ndarray-type,is-scalar-type, exp) => (e1,e2) 
+    + match-binop-types( is-int-ndarray-type,is-scalar-type, exp) => (e1,e2) 
+    + match-binop-types( is-bool-ndarray-type,is-scalar-type, cast-to-matrix(exp), exp) => (e1,e2)
+    )
+  ; get-binop
+  ; ( \ |[ +  ]| -> exp |[ e1 + e2           ]| \
+    + \ |[ -  ]| -> exp |[ e1 - e2           ]| \
+    + \ |[ *  ]| -> exp |[ e1 * e2           ]| \
+    + \ |[ .* ]| -> exp |[ e1 * e2           ]| \
+    + \ |[ /  ]| -> exp |[ e1 / e2           ]| \
+    + \ |[ ./ ]| -> exp |[ e1 / e2           ]| \
+    + \ |[ ^  ]| -> exp |[ xpow(e1, e2)      ]| \
+    + \ |[ .^ ]| -> exp |[ elem_xpow(e1, e2) ]| \
+    + \ |[ .\ ]| -> exp |[ x_el_div(e2, e1)  ]| \
+    + generic-one-matrix(|e1,e2)
+    )
+
+   binop-s-m(exp) =
+    where( 
+      match-binop-types( is-float-ndarray-type,is-scalar-type, cast-to-matrix(exp)) => (e1,e2) 
+    + match-binop-types( is-int-ndarray-type,is-scalar-type, cast-to-matrix(exp)) => (e1,e2) 
+    )
+  ; get-binop
+  ; \ |[ \  ]| -> exp |[ xleftdiv(e1,e2) ]| \
+
+
+/**
+ *  Binary operators for string 'op' matrix
+ */
+rules
+  
+
+/**
+ *  Binary operators for string 'op' scalars
+ */
+rules
+  
+
+/**
+ *  Binary operators for string 'op' string
+ */
+rules
+
+  // Transpose
+  TranslateUnOp(exp) =
+    o2c-postfix(
+      is-char-ndarray-type
+    , \ Exp |[ e'  ]| -> exp |[ e1.char_matrix_value().transpose() ]| where <exp>e => e1 \
+    + \ Exp |[ e.' ]| -> exp |[ e1.char_matrix_value().transpose() ]| where <exp>e => e1 \
+    )
+
+  binop-str-str(exp) =
+    where( 
+      match-binop-types( is-char-ndarray-type,is-char-ndarray-type, exp) => (e1,e2)
+    )
+  ; get-binop
+  ; ( \ |[ == ]| -> exp |[ e1 == e2 ]| \
+    )
+
+
+/**
+ *  Binary operators for octave values
+ */
+rules
+/*
+  TranslateUnOp(exp) :
+    Exp |[ uo e1 ]|
+      -> exp |[ x ]|
+    where 
+      <get-octave-type;is-octave-value-type>e1
+    ; <?Exp |[ z ]|>e1
+    ; <\ "++" -> "op_incr" \ + \ "--" -> "op_decr" \>uo => op
+    ; <newname>"ov" => x
+    ; <newname>"olv" => y
+    ; !stm |[ { octave_lvalue y ;
+                octave_value x ;
+                y = x.lvalue() ;
+                y . do_unary_op(~str:op) ;
+                x = y.value() ;
+              } 
+           ]|
+
+  TranslateUnOp(exp) :
+    Exp |[ e1 uo ]|
+      -> exp |[ x ]|
+    where 
+      <get-octave-type;is-octave-value-type>e1 
+    ; <?Exp |[ z ]|>e1
+    ; <\ "++" -> "op_incr" \ + \ "--" -> "op_decr" \>uo => op
+    ; <newname>"olv" => x
+    ; <newname>"ov" => y
+    ; !stm |[ { octave_lvalue y ;
+                octave_value x ;
+                y = x.lvalue() ;
+                x = y.value() ;
+                y.do_unary_op(~str:op) ;
+              } 
+           ]| => ss
+    ; rules( init-stats :+ _ -> [ss] )
+*/
+
+  TranslateUnOp(exp) :
+    Exp |[ uo e1 ]|
+      -> exp |[ do_unary_op(x, ~exp:<exp>e1 ) ]|
+    where 
+      <get-octave-type;is-octave-value-type>e1
+    ; <lookup-ov-unop>uo => x
+
+  TranslateUnOp(exp) :
+    Exp |[ e1 uo ]|
+      -> exp |[ do_unary_op(x, ~exp:<exp>e1 ) ]|
+    where 
+      <get-octave-type;is-octave-value-type>e1
+    ; <lookup-ov-unop>uo => x
+
+  binop-ov-ov(exp) :
+    Exp |[ e1 bo e2 ]|
+      -> exp |[ do_binary_op(x , ~exp:<exp>e1 , ~exp:<exp>e2 ) ]|
+    where 
+    ( <get-octave-type;(is-octave-value-type)>e1
+    + <get-octave-type;(is-octave-value-type)>e2 ) 
+    ; <lookup-ov-binop>bo => x
+
+  has-any-type = ?MATRIX(ANY_TYPE(),_) + ?SCALAR(ANY_TYPE())
+
+  lookup-ov-unop = 
+    ( \ "!"  -> "op_not" \
+    + \ "-"  -> "op_uminus" \
+    + \ "'"  -> "op_hermitian" \
+    + \ ".'" -> "op_transpose" \
+//    + \ "++" -> "op_incr" \
+//    + \ "--" -> "op_decr" \
+    )
+  ; <concat-strings>["octave_value::",<id>]
+
+  lookup-ov-binop = 
+    ( \ "+"   -> "op_add" \
+    + \ "-"   -> "op_sub" \
+    + \ "*"   -> "op_mul" \
+    + \ "/"   -> "op_div" \
+    + \ "^"   -> "op_pow" \
+    + \ "\\"  -> "op_ldiv" \
+    + \ "<<"  -> "op_lshift" \
+    + \ ">>"  -> "op_rshift" \
+    + \ ".*"  -> "op_el_mul" \
+    + \ "./"  -> "op_el_div" \
+    + \ ".^"  -> "op_el_pow" \
+    + \ ".\\" -> "op_el_ldiv" \
+    + \ "<"   -> "op_lt" \
+    + \ "<="  -> "op_le" \
+    + \ "=="  -> "op_eq" \
+    + \ ">="  -> "op_ge" \
+    + \ ">"   -> "op_gt" \
+    + \ "!="  -> "op_ne" \
+    + \ "&"  -> "op_el_and" \
+    + \ "|"  -> "op_el_or" \
+    )
+  ; <concat-strings>["octave_value::",<id>]
+
+
+  cast-to-matrix(exp) =
+    !exp |[ octave_value(~exp:<exp>).matrix_value() ]|
+
+  cast-to-complex-matrix(exp) =
+    !exp |[ octave_value(~exp:<exp>).complex_matrix_value() ]|

@@ -1,0 +1,229 @@
+module Translate-Statements
+imports Insn-extra
+rules
+
+ TransProg:
+  Prog(funcs, e) ->  PROGRAM(funcs')
+  where <conc>(funcs,[e]) => funcs'
+
+
+  
+
+ TransProc:
+ FunctionDec([], f, e1, e) ->  
+  FUNCTION(SEQS(locs),
+  SEQS([ALLOC_FRAME(0, in_args),
+	LABELREF(LOC(x, WORD), f),
+	LABELREF(LOC(y, WORD), lend),
+
+	LABEL(f),	
+	e',
+	LABEL(lend),
+	FREE_FRAME(in_args, 1)  
+      ]), SEQS([])
+    )
+   where (<length> e1 <+ !0) => n_args;
+	 <add> (1, n_args) => in_args;
+	 new => x; new => y;
+         new => lend;
+         <map(BindArgToLoc)> e1 => locs;
+	 <try(tr-stm)> e => e';
+	 rules(
+	   GetLocation: 
+	    Call(f, es){t} -> LOC(x, WORD)        //locs 
+	 )
+
+ TransFunction:
+   FunctionDec(e2, f, e1, e) ->  
+    FUNCTION( SEQS(locs),
+   SEQS([ ALLOC_FRAME(num-ret, in_args),
+	LABELREF(LOC(x, WORD), f),
+	LABELREF(LOC(y, WORD),lend),
+	LABEL(f),
+        e',
+	ret-vals,	
+	LABEL(lend),
+	FREE_FRAME(num-ret, in_args)  
+      ]) , SEQS(locs'))
+
+   where (<length> e2 <+ !1 )=> num-ret;
+	 (<length> e1 <+ !0) => args;
+	 <add> (args , 1) => in_args;
+	 new => lstart; new =>x ; new => y;
+         new => lend; new => ldone;
+         <map(BindArgToLoc)> e1 => locs;
+         <map(BindArgToLoc)> e2 => locs';
+	 <try(tr-stm)> e=> e';
+	 <CopyRetValsToStack> locs'  => ret-vals;
+	 <Hd> locs' => init_ret_loc_onstack;
+	 rules(
+	  GetRetLocation: Call(f, es){t} -> (0, init_ret_loc_onstack)
+	  GetLocation : Call(f, es){t} -> LOC(x, WORD)  
+	 )  
+
+TrStmt:
+  |[ if e1 then e2 else e3 end ]| ->
+  SEQS(
+   [	LABELREF(LOC(ref,WORD), ltrue),
+	LABELREF(LOC(done,WORD), lend),
+
+	Cx(e1, LOC(ref,WORD), None ),
+	e3,
+	BRANCH(N, None, LOC(done,WORD), None),    // unconditional jump??
+	LABEL(ltrue),
+	e2,
+	LABEL(lend)	
+  ])
+  where  new => done; new => ref;
+	new => ltrue;  new => lend; 
+	<TrCond> e1 => DATA(op,[x],y)
+
+  TrStmt:
+  |[ if e1 then e2 end ]| ->
+  SEQS([LABELREF(LOC(done,WORD), lend),
+	LABELREF(LOC(ltrue',WORD), ltrue),
+
+	Cx(e1, LOC(ltrue',WORD), LOC(done,WORD)),			  
+	LABEL(ltrue),
+	e2,
+	LABEL(lend)	
+   ])
+  where  new => done;  new => lend; 
+	 new => ltrue; new => ltrue'
+
+
+  TrStmt:
+  For(Var(v), Range(i,s,l), body) ->
+  SEQS([STORE(LOC(v,INT),i),
+	NOTE_LOC_BIRTH(last'),
+	NOTE_LOC_BIRTH(LOC(step,WORD)),
+	NOTE_LOC_BIRTH(LOC(tmp ,WORD)),
+
+	STORE(last',l),
+	STORE(tmp, LOC(v,WORD) ),
+	DATA(LE, [tmp], [last']),
+
+	LABELREF( begin', start),
+	LABELREF(LOC(end, WORD), done),
+	LABELREF(LOC(inc,WORD), increment),
+	STORE(tmp, Var(v)),
+	BRANCH(EQ, Var(v), begin', done'),
+        NOTE_LOOP_START(start),
+	body,
+	STORE(tmp, Var(v)),
+	DATA(LT, [tmp], [last']),
+	BRANCH(EQ, tmp, inc, done'),
+
+        LABEL(increment),
+        DATA(ADD, [Var(v)], [LOC(step,WORD)]),
+	BRANCH(A, None, begin', None),	
+
+	NOTE_LOOP_FINISH(done),
+	NOTE_LOC_DEATH(last'),
+	NOTE_LOC_DEATH(LOC(step,WORD))
+       ])
+  where new => last; new => step; 
+	new => start; new => done;
+	new => begin; new => end;
+	new => inc; new => increment;
+	new => tmp';
+	!LOC(done,  WORD) => done';
+	!LOC(begin, WORD) => begin';
+	!LOC(tmp', WORD) => tmp;
+	!LOC(last,WORD) => last' 
+
+ TrStmt :
+  While(e1, e2)-> 
+  SEQS([ LABELREF(tst', tst),
+	LABELREF(start', start),
+	LABELREF(done', done),
+
+	LABEL(tst),
+	Cx(e1, start', done'),
+
+	LABEL(start),
+	e2,
+	BRANCH(A, None, tst', None),
+	LABEL(done)		
+      ])
+    where new => tst; new => ltst;     !LOC(ltst, WORD) => tst';
+	  new => start; new => lstart; !LOC(lstart, WORD) => start';
+	  new => done; new => ldone;   !LOC(ldone, WORD) => done';
+	  rules(
+		TrStmt : Break{t} -> BRANCH(A, None, done' ,None)
+		TrStmt : Continue{tx} -> BRANCH(A, None, tst', None)
+	   )
+
+// Procedure call
+  TrStmt:
+  EX(Call(FuncName(fn,ty), es){sh}) -> 
+    SEQS([
+	LABELREF(ret_addr, loc),
+	SEQS(init-stack-args), 
+	stack-code, 
+	BRANCH(A, None, func_loc, ret_addr),
+	LABEL(loc)
+         ])
+  where <conc-strings> (fn,ty) => f;
+	; <GetLocation> Call(f, es){sh} => func_loc
+	; new => loc;
+	; !LOC(<new>, WORD) => ret_addr
+	; <length> es => num-args;
+	; ![Int(num-args){M(INT,D(Int(1),Int(1)))}| es] => args
+        ; <nzip0(ArgToStack)> args => init-stack-args
+	; <MoveStackPointer> (<add> (num-args,1)) => stack-code
+
+
+
+ // Function Call
+  TrStmt:
+  STORE(v_loc, Call(FuncName(fname, ty), es)) ->
+  SEQS([stms',
+	OUT_RET(i, ret_loc),
+	STORE(v_loc, ret_loc)
+       ])
+  where <conc-strings> (fname,ty) => f;
+	<GetRetLocation> Call(f, es){NIL} => (i, ret_loc);
+	<TrStmt> EX(Call(FuncName(fname, ty), es){NIL}) => stms'
+
+
+ (*  TrStmt:
+  Assign(Var(x){M(t, d)}, e) -> STORE(x_loc, e)
+  where <not(TrVar)> Var(x){M(t, d)};
+	!LOC(x, t) => x_loc;
+	rules(TrVar: Var(x){tx} -> x_loc)
+
+  TrStmt:
+  Assign(Var(x){M(t, d)}, e) -> STORE(LOC(x',y), e)
+  where <TrVar> Var(x){M(t, d)}  => LOC(x',y)       *)
+
+  TrStmt:
+  Assign(Var(x){M(t, d)}, BinOp(o,e1,e2){tbo}) -> 
+  SEQS([NOTE_LOC_BIRTH(loc1),
+	NOTE_LOC_BIRTH(loc2),
+
+	STORE(loc1, e1),
+	STORE(loc2, e2),
+	DATA(o,loc1,loc2),
+	STORE(LOC(x',y), loc1),
+
+	NOTE_LOC_DEATH(loc1),	
+	NOTE_LOC_DEATH(loc2)	
+       ])
+  where !LOC(<new>,t) =>loc1;
+	!LOC(<new>,t) =>loc2;
+	(<TrVar> Var(x){M(t, d)} <+ !LOC(x,t) ) => LOC(x',y)
+ 
+
+  TrStmt1: 
+  Assign(Var(x){M(t, _)}, Int(y){_}) -> CONST(LOC(x,t), y)
+  where rules(TrVar: Var(x){tx} -> LOC(x,t))
+
+ 
+  TrStmt:
+  AssignMulti(xs, es) -> SEQS(ss)
+  where <zip(\(x,e) -> STORE(x,e) \ )> (xs,es) => ss
+
+  TrStmt:
+  |[ { es* } ]| -> SEQS(es*)
+

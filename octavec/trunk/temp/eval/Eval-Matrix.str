@@ -1,0 +1,71 @@
+module Eval-Matrix
+rules
+
+ EvalMatrix:
+ Matrix([[x]]) -> x
+
+
+// MATRIX
+ Add-element:
+ (x,[Int(y)],Matrix([])) -> Matrix([res])
+ where	<at-last(![x])> (<string-to-int; dec; create-row-zeros> y) => res
+
+ Add-element:
+ (x,[Int("1")],Matrix([])) -> Matrix([[x]])
+
+ Add-element:
+ (x,[Int(i)],Matrix([vs])) -> Matrix([vs'])
+ where <subt>(<string-to-int>i,<length> vs) => gap;
+       <at-last(![x])> (<dec; create-row-zeros> gap) => res;
+       <conc>(vs,res) =>vs'
+            
+
+//MATRIX
+
+ Replace-element:
+ (Int(x),[Int(i)],Matrix([vs])) -> Matrix([rs])
+ where <replace-element>(i,Int(x), vs) =>rs
+
+
+ Update-Matrix(replace, add):
+  (rhs,[Int(i)], Matrix([])) -> <add>(rhs,[Int(i)], Matrix([]))
+
+ Update-Matrix(replace, add):
+  (rhs,[Int(i)], Matrix(rs)) -> <add>(rhs,[Int(i)], Matrix(rs))
+ where <lt>(<length>rs,i) 
+
+ Update-Matrix(replace, add):
+ (rhs,[Int(i)], Matrix([vs])) -> <replace> (rhs,[Int(i)], Matrix([vs]))
+ where <geq>(<length>vs,<string-to-int>i)  
+
+
+
+ // CELL
+ Add-element:
+ (x,[Int(y)],Cell([])) -> Cell([res])
+ where	<at-last(![x])> (<string-to-int; dec; create-row-zeros> y) => res
+
+ Add-element:
+ (x,[Int("1")],Cell([])) -> Cell([[x]])
+
+ Add-element:
+ (x,[Int(i)],Cell([vs])) -> Cell([vs'])
+ where <subt>(<string-to-int>i,<length> vs) => gap;
+       <at-last(![x])> (<dec; create-row-zeros> gap) => res;
+       <conc>(vs,res) =>vs'
+            
+ Replace-element:
+ (Int(x),[Int(i)],Cell([vs])) -> Cell([rs])
+ where <replace-element>(i,Int(x), vs) =>rs
+
+
+ Update-Cell(replace, add):
+  (rhs,[Int(i)], Cell([])) -> <add>(rhs,[Int(i)], Cell([]))
+
+ Update-Cell(replace, add):
+  (rhs,[Int(i)], Cell(rs)) -> <add>(rhs,[Int(i)], Cell(rs))
+ where <lt>(<length>rs,<string-to-int>i) 
+
+ Update-Cell(replace, add):
+ (rhs,[Int(i)], Cell([vs])) -> <replace> (rhs,[Int(i)], Cell([vs]))
+ where <geq>(<length>vs,<string-to-int>i) 

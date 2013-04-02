@@ -1,0 +1,89 @@
+module Octave-Dependence-Testing
+imports 
+  liblib 
+  liboctavec
+  Octave-ZIV 
+  Octave-SIV 
+  Octave-ZIV 
+signature
+  constructors
+    WRONG-INPUT       : Constraint
+
+strategies
+
+  test-possible-dependence =
+   ? (uid1, index1, uid2, index2, class) => dep
+   ; <zip>(index1,index2) => index
+   ; <zip>(index,class) => complete 
+   ; map( test-subscript-pair(| uid1, uid2) )
+   ; try( not-contains(? NO-DEP)
+ 	; add-dependence(|uid1,uid2)
+     )
+	  
+  add-dependence(|uid1,uid2) =
+    log(|Debug(),["Found dependence between '",<IdToStat>uid1,"' and '",<IdToStat>uid2,"'"])
+  ; rules( 
+      HasDependence : uid1 
+      HasDependence : uid2 
+    )
+    
+  test-subscript-pair(|uid1, uid2) = 
+    ? ((a,b),c) => dep
+    ; where(<IdToIV>uid1 => ivsa ; <IdToIV>uid2 => ivsb ; <union>(ivsa,ivsb) => ivsall)
+    ; if <no-wrong-inputs(| uid1,uid2,ivsa,ivsb)>(a,b)
+      then <apply-appropriate-test(| uid1,uid2,ivsall)> dep
+      else !WRONG-INPUT
+      end
+ 
+  apply-appropriate-test(| uid1,uid2,ivsall) =
+    ? ((a,b),c)
+    ; switch !c 
+        case ?(SIV,iv) : <SIV-test(|uid1,uid2,iv)> (a,b)
+        case ?ZIV      : <ZIV-test> (a,b)
+	case ?MIV      : <MIV-test(| ivsall)> (a,b)
+      end
+
+  no-wrong-inputs(| uid1,uid2,ivsa,ivsb) =
+    ? pair
+    ; <no-vars-in-bounds>(ivsa, ivsb) 
+    ; <only-contains-ivs> pair
+    ; <no-wrong-input>pair
+    ; no-iv-assign(|pair)
+ 
+  no-vars-in-bounds = 
+    not-contains(? |[ x ]|)
+  
+  no-iv-assign(| pair) =
+    not(oncetd({x: ?|[ x ]|; IsAssign }))
+    
+  get-occurrences(pred) =
+    collect-all(pred)
+  
+  only-contains-ivs =
+    not(oncetd({x: ?Var(x) ; <not(IsIV)>x}))
+
+  no-wrong-input = 
+     not-contains({
+       ?|[ x[a*] ]| 
+       <+ ?Matrix(e) 
+       <+ ?Call(var,e) 
+       <+ ?Constant(e)
+       <+ ?|[ e ^ e1 ]|
+     })
+        
+  check-linearity =
+    if contains(combination)
+    then !WRONG-INPUT
+    end
+     
+  combination = 
+     ? |[ x * y  ]| 
+  <+ ? |[ y *  (i bo x)  ]|
+  <+ ? |[ ((i bo x) * y)  ]|
+  <+ ? |[ ((i bo1 x) * (j bo2 y))  ]|
+  <+ ? |[ x / y  ]|
+  <+ ? |[ (y / (i bo x))  ]|
+  <+ ? |[ ((i bo x) / y)  ]|
+  <+ ? |[ ((i bo1 x) / (j bo2 y))  ]|
+
+  

@@ -1,0 +1,1334 @@
+Message-ID: <41EC4E65.1010309@cs.uu.nl>
+Date: Tue, 18 Jan 2005 00:46:45 +0100
+From: Rob Vermaas <rbvermaa@cs.uu.nl>
+User-Agent: Mozilla Thunderbird 0.9 (X11/20041124)
+X-Accept-Language: en-us, en
+MIME-Version: 1.0
+To:  rbvermaa@cs.uu.nl
+Subject: octave
+Content-Type: multipart/mixed;
+ boundary="------------080601040501070601010704"
+
+This is a multi-part message in MIME format.
+--------------080601040501070601010704
+Content-Type: text/plain; charset=ISO-8859-1; format=flowed
+Content-Transfer-Encoding: 7bit
+
+
+
+--------------080601040501070601010704
+Content-Type: text/x-objcsrc;
+ name="give_edge.m"
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline;
+ filename="give_edge.m"
+
+function img = give_edge(x,threshold)
+  [n,m] = size(x);
+  for i = 1:n
+    for j = 1:m
+      if x(i,j) < threshold
+        img(i,j) = 255;
+      else
+        img(i,j) = 0;
+      end
+    end
+  end
+end
+
+--------------080601040501070601010704
+Content-Type: text/x-objcsrc;
+ name="imread.m"
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline;
+ filename="imread.m"
+
+#IMREAD: read images into octave from various file formats
+#
+# Note: this requires the ImageMagick "convert" utility
+#       get this from www.imagemagick.org if required
+#       additional documentation of options is available from the
+#       convert man page
+#
+# BASIC USAGE:
+# img    = imread( fname )
+#                 - img is a greyscale (0-255) of image in fname
+# [im,map]=imread( fname )
+#                 - map is a matrix of [r,g,b], 0-1 triples
+#                 - img is a matrix on indeces into map
+# [r,g,b]= imread( fname )
+#                 - r,g,b are red,green,blue (0-255) compondents
+#
+# Formats for image fname
+#   1. simple guess from extention ie "fig.jpg", "blah.gif"
+#   2. specify explicitly             "jpg:fig.jpg", "gif:blah.gif"
+#   3. specify subimage for multi-image format "tiff:file.tif[3]"
+#   4. raw images (row major format) specify geometry
+#                                      "raw:img[256x180]"
+#
+# IMREAD OPTIONS:
+# imread will support most of the options for convert.1
+#
+# img    = imread( fname , options)
+# [r,g,b]= imread( fname , options)
+#
+# where options is a string matrix (or list) of options
+#
+# example:   options= ["-rotate 25";
+#                      "-crop 200x200+150+150";
+#                      "-sample 200%" ];
+#   will rotate, crop, and then expand the image.
+#   note that the order of operations is important
+#
+# The following options are supported
+#  -antialias           remove pixel-aliasing
+#  -blur geometry       blur the image
+#  -border geometry     surround image with a border of color
+#  -bordercolor color   border color
+#  -colors value        maximum number of colors in the image
+#  -colorspace type     alternate image colorspace
+#  -contrast            enhance or reduce the image contrast
+#  -crop geometry       preferred size and location of the cropped image
+#  -despeckle           reduce the speckles within an image
+#  -dither              apply Floyd/Steinberg error diffusion to image
+#  -draw string         annotate the image with a graphic primitive
+#  -edge radius         apply a filter to detect edges in the image
+#  -emboss radius       emboss an image
+#  -enhance             apply a digital filter to enhance a noisy image
+#  -equalize            perform histogram equalization to an image
+#  -filter type         use this filter when resizing an image
+#  -flip                flip image in the vertical direction
+#  -flop                flop image in the horizontal direction
+#  -font name           font for rendering text
+#  -frame geometry      surround image with an ornamental border
+#  -fuzz distance       colors within this distance are considered equal
+#  -gamma value         level of gamma correction
+#  -geometry geometry   perferred size or location of the image
+#  -gaussian geometry   gaussian blur an image
+#  -gravity type        vertical and horizontal text placement
+#  -implode amount      implode image pixels about the center
+#  -intent type         Absolute, Perceptual, Relative, or Saturation
+#  -interlace type      None, Line, Plane, or Partition
+#  -level value         adjust the level of image contrast
+#  -map filename        transform image colors to match this set of colors
+#  -median radius       apply a median filter to the image
+#  -modulate value      vary the brightness, saturation, and hue
+#  -monochrome          transform image to black and white
+#  -mosaic              create an mosaic from an image sequence
+#  -negate              replace every pixel with its complementary color
+#  -noise radius        add or reduce noise in an image
+#  -normalize           transform image to span the full range of colors
+#  -paint radius        simulate an oil painting
+#  -raise value         lighten/darken image edges to create a 3-D effect
+#  -region geometry     apply options to a portion of the image
+#  -roll geometry       roll an image vertically or horizontally
+#  -rotate degrees      apply Paeth rotation to the image
+#  -sample geometry     scale image with pixel sampling
+#  -scale geometry      resize image
+#  -scene value         image scene number
+#  -segment values      segment an image
+#  -seed value          pseudo-random number generator seed value
+#  -shade degrees       shade the image using a distant light source
+#  -sharpen geometry    sharpen the image
+#  -shave geometry      shave pixels from the image edges
+#  -shear geometry      slide one edge of the image along the X or Y axis
+#  -size geometry       width and height of image
+#  -solarize threshold  negate all pixels above the threshold level
+#  -spread amount       displace image pixels by a random amount
+#  -swirl degrees       swirl image pixels about the center
+#  -texture filename    name of texture to tile onto the image background
+#  -threshold value     threshold the image
+#  -transparent color   make this color transparent within the image
+#  -treedepth value     depth of the color tree
+#  -type type           image type
+#  -unsharp geometry    sharpen the image
+#  -wave geometry       alter an image along a sine wave
+
+# Author: Andy Adler
+
+function [out1,out2,out3]= imread(filename, options );
+
+try save_empty_list_elements_ok= empty_list_elements_ok;
+catch save_empty_list_elements_ok= 0;
+end
+try save_warn_empty_list_elements= warn_empty_list_elements;
+catch save_warn_empty_list_elements= 0;
+end
+unwind_protect
+empty_list_elements_ok= 1;
+warn_empty_list_elements= 0;
+
+if (nargin == 0)
+  usage (["img    =  imread (filename,options)\n", ...
+          "[r,g,b]=  imread (filename,options)\n", ...
+          "[img,map]=imread (filename,options)" ]);
+elseif (! isstr (filename))
+  error ("imread: expecting filename as a string");
+endif
+
+if any(filename==':') || any(filename=='[')
+   # we've using special imagemagick characters, so we don't
+   # do any octave path processing
+   fname= filename;
+else
+   fname= file_in_path(IMAGEPATH,filename);
+   if isempty(fname)
+      error(['imread: file ' filename ' not found']);
+   end
+end
+
+# Put together the options string
+# TODO: add some error checking here
+if nargin==1
+   option_str="";
+else
+   option_str="";
+   if     ( is_list( options ) )
+      for i= 1:length(options)
+         option_str=[option_str," ", nth(options,i) ];
+      end
+   elseif ( isstr( options ) )
+      for i= 1:size(options,1)
+         option_str=[option_str," ", options(i,:) ];
+      end
+   else
+     error ("imread: expecting options as a string");
+   end
+end
+#
+# decode the nargout to output what the user wants
+#
+if     nargout==3;
+    wantgreyscale= 0;
+    wantmap= 0;
+    outputtype="ppm";
+elseif nargout==2;
+    wantgreyscale= 0; wantmap= 1;
+    outputtype="ppm";
+else
+    wantgreyscale= 1; wantmap= 0;
+    outputtype="pgm";
+end
+
+#  pname= sprintf("convert %s '%s' %s:- 2>/dev/null",
+#  pname= sprintf("convert %s '%s' %s:- ",
+#                 option_str, fname, outputtype);
+#  fid= popen(pname ,'r');
+#  disp(pname); disp(fid);
+
+   tnam= tmpnam();
+   cmd= sprintf("convert %s '%s' '%s:%s' 2>/dev/null ",
+                  option_str, fname, outputtype, tnam) ;
+   system(cmd);
+   fid= fopen(tnam,"rb");
+#
+# can we open the pipe?
+# if not 1) The file format is wrong and the conver program has bailed out
+#        2) The apropriate converter program hasn't been installed
+#
+   if fid<0;
+      unlink(tnam);
+      error(['could not read file: ' tnam]);
+   end
+
+# get file type
+   line= fgetl( fid );
+   if     strcmp(line, 'P1');   bpp=1; spp=1; bindata=0;
+   elseif strcmp(line, 'P4');   bpp=1; spp=1; bindata=1;
+   elseif strcmp(line, 'P2');   bpp=8; spp=1; bindata=0;
+   elseif strcmp(line, 'P5');   bpp=8; spp=1; bindata=1;
+   elseif strcmp(line, 'P3');   bpp=8; spp=3; bindata=0;
+   elseif strcmp(line, 'P6');   bpp=8; spp=3; bindata=1;
+   else
+#     pclose(fid);
+      fclose(fid); unlink(tnam);
+      error(['Image format error for ',fname,':line=', setstr(line)]);
+   end
+
+# ignore comments
+   line= fgetl( fid );
+   while length(line)==0 || line(1)=='#'
+      line= fgetl( fid );
+   end
+
+# get width, height
+   [wid, hig]= sscanf( line, '%d %d', 'C' );
+
+# get max component value
+   if bpp==8
+     max_component= sscanf( fgetl(fid), '%d' );
+     if (max_component > 255)
+       # The PGM standard supports only values below 65536
+       bpp = 16;
+     endif
+   end
+
+   if bindata
+      if(bpp == 16)
+         # PGM format has MSB first, i.e. big endian
+         data = fread(fid, "uint16", 0, "ieee-be");
+      else
+         data = fread(fid);
+      endif
+      numdata= size(data,1);
+
+      if bpp==1
+         data= rem( floor( (data*ones(1,8)) ./ ...
+                 (ones(length(data),1)*[128 64 32 16 8 4 2 1]) ), 2)';
+      end
+   else
+      numdata= wid*hig*spp;
+      data= zeros( numdata,1 );
+      dptr= 1;
+
+         line= fgetl( fid );
+      while !feof( fid)
+         rdata= sscanf( line ,' %d');
+         nptr= dptr + size(rdata,1);
+         data( dptr:nptr-1 ) = rdata;
+         dptr= nptr;
+         line= fgetl( fid );
+      end # feof
+   end #if bindata
+
+#  pclose(fid);
+   fclose(fid); unlink(tnam);
+
+   if spp==1
+      greyimg= reshape( data(:), wid, hig )';
+   elseif spp==3
+      redimg= reshape( data(1:spp:numdata), wid, hig )';
+      grnimg= reshape( data(2:spp:numdata), wid, hig )';
+      bluimg= reshape( data(3:spp:numdata), wid, hig )';
+   else
+      error(sprintf("imread: don't know how to handle pnm with spp=%d",spp));
+   end
+
+
+#   This section outputs the image in the desired output format
+# if the user requested the colour map, the we regenerate it from
+# the image.
+#
+#   Of course, 1) This may result in huge colourmaps
+#              2) The colourmap will not be in the same order as
+#                   in the original file
+
+if wantgreyscale
+
+   if exist('greyimg')
+      out1= greyimg;
+   elseif exist('idximg')
+      greymap= mean(map')';
+      out1= reshape( greymap( idximg ) , size(idximg,1), size(idximg,2) );
+   else
+      out1= ( redimg+grnimg+bluimg ) / 3 ;
+   end
+
+elseif wantmap
+
+   if exist('idximg')
+      out1= idximg;
+      out2= map;
+   elseif exist('greyimg')
+      [simg, sidx] = sort( greyimg(:) );
+      [jnkval, sidx] = sort( sidx );
+
+      dimg= [1; diff(simg)>0 ];
+      cimg= cumsum( dimg );
+      out1= reshape( cimg( sidx ) , hig, wid);
+      out2= ( simg(find( dimg ))*[1,1,1] - 1)/256;
+   else
+#
+# Generate a colourmap for RGB images by packing RGB into
+# an integer and assigning the unique values to a colormap.
+#
+      c_range= 256; # use 65536 for 48 bit color
+      [simg, sidx] = sort( round(redimg(:)) + ...
+                  c_range *round(grnimg(:)) + ...
+                c_range^2 *round(bluimg(:)) );
+      [jnkval, sidx] = sort( sidx );
+
+      dimg= [1; diff(simg)>0 ];
+      cimg= cumsum( dimg );
+      out1= reshape( cimg( sidx ) , hig, wid );
+      tmpv= simg(find( dimg ));
+      out2= [ rem(tmpv,c_range), ...
+              rem(floor(tmpv/c_range), c_range), ...
+              floor(tmpv/c_range^2) ]/c_range;
+   end
+
+
+else
+
+   if exist('greyimg')
+      out1= greyimg;
+      out2= greyimg;
+      out3= greyimg;
+   else
+      out1= redimg;
+      out2= grnimg;
+      out3= bluimg;
+   end
+
+end
+
+unwind_protect_cleanup
+empty_list_elements_ok= save_empty_list_elements_ok;
+warn_empty_list_elements= save_warn_empty_list_elements;
+end_unwind_protect
+
+#
+# $Log: imread.m,v $
+# Revision 1.9  2004/02/18 14:54:10  pkienzle
+# Colour values from ppm are 0-255 not 1-256
+#
+# Revision 1.8  2003/11/14 16:55:10  tpikonen
+# Fix endianess bug in 16-bit reads.
+#
+# Revision 1.6  2003/09/12 14:22:42  adb014
+# Changes to allow use with latest CVS of octave (do_fortran_indexing, etc)
+#
+# Revision 1.5  2003/07/25 19:11:41  pkienzle
+# Make sure all files names referenced in system calls are wrapped in quotes
+# to protect against spaces in the path.
+#
+# Revision 1.4  2002/11/27 08:40:11  pkienzle
+# author/license updates
+#
+# Revision 1.3  2002/03/19 18:14:13  aadler
+# unfortunately using popen seems to create problems, mostly
+# on win32, but also on linux, so we need to move to a tmpfile approach
+#
+# Revision 1.2  2002/03/17 05:26:14  aadler
+# now accept filenames with spaces
+#
+# Revision 1.1  2002/03/11 01:56:47  aadler
+# general image read/write functionality using imagemagick utilities
+#
+#
+
+--------------080601040501070601010704
+Content-Type: text/x-objcsrc;
+ name="imwrite.m"
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline;
+ filename="imwrite.m"
+
+#IMWRITE: write image from octave to various file formats
+#
+# Note: this requires the ImageMagick "convert" utility.
+#       get this from www.imagemagick.org if required
+#       additional documentation of options is available from the
+#       convert man page
+#
+# BASIC USAGE:
+# imwrite( fname, img )
+#                 - img is a greyscale (0-255) of image in fname
+# imwrite( fname, img, map )
+#                 - map is a matrix of [r,g,b], 0-1 triples
+#                 - img is a matrix on indeces into map
+# imwrite( fname, r,g,b );
+#                 - r,g,b are red,green,blue (0-255) compondents
+#
+# Formats for image fname
+#   1. simple guess from extention ie "fig.jpg", "blah.gif"
+#   2. specify explicitly             "jpg:fig.jpg", "gif:blah.gif"
+#   3. specify subimage for multi-image format "tiff:file.tif[3]"
+#   4. raw images (row major format) specify geometry
+#                                      "raw:img[256x180]"
+#
+# IMREAD OPTIONS:
+# imread will support most of the options for convert.1
+#
+# imwrite( fname, img, options )
+# imwrite( fname, img, map, options )
+# imwrite( fname, r,g,b, options );
+#
+# where options is a string matrix (or list) of options
+#
+# example:   options= ["-rotate 25";
+#                      "-crop 200x200+150+150";
+#                      "-sample 200%" ];
+#   will rotate, crop, and then expand the image.
+#   note that the order of operations is important
+#
+# The following options are supported
+#  -antialias           remove pixel-aliasing
+#  -background color    background color
+#  -blur geometry       blur the image
+#  -border geometry     surround image with a border of color
+#  -bordercolor color   border color
+#  -box color           color for annotation bounding box
+#  -charcoal radius     simulate a charcoal drawing
+#  -colorize value      colorize the image with the fill color
+#  -colors value        preferred number of colors in the image
+#  -colorspace type     alternate image colorspace
+#  -comment string      annotate image with comment
+#  -compress type       type of image compression
+#  -contrast            enhance or reduce the image contrast
+#  -crop geometry       preferred size and location of the cropped image
+#  -density geometry    vertical and horizontal density of the image
+#  -depth value         depth of the image
+#  -despeckle           reduce the speckles within an image
+#  -dispose method      GIF disposal method
+#  -dither              apply Floyd/Steinberg error diffusion to image
+#  -draw string         annotate the image with a graphic primitive
+#  -edge radius         apply a filter to detect edges in the image
+#  -emboss radius       emboss an image
+#  -enhance             apply a digital filter to enhance a noisy image
+#  -equalize            perform histogram equalization to an image
+#  -fill color          color to use when filling a graphic primitive
+#  -filter type         use this filter when resizing an image
+#  -flip                flip image in the vertical direction
+#  -flop                flop image in the horizontal direction
+#  -font name           font for rendering text
+#  -frame geometry      surround image with an ornamental border
+#  -fuzz distance       colors within this distance are considered equal
+#  -gamma value         level of gamma correction
+#  -geometry geometry   perferred size or location of the image
+#  -gaussian geometry   gaussian blur an image
+#  -gravity type        vertical and horizontal text placement
+#  -implode amount      implode image pixels about the center
+#  -intent type         Absolute, Perceptual, Relative, or Saturation
+#  -interlace type      None, Line, Plane, or Partition
+#  -label name          assign a label to an image
+#  -level value         adjust the level of image contrast
+#  -list type           Color, Delegate, Format, Magic, Module, or Type
+#  -map filename        transform image colors to match this set of colors
+#  -matte               store matte channel if the image has one
+#  -median radius       apply a median filter to the image
+#  -modulate value      vary the brightness, saturation, and hue
+#  -monochrome          transform image to black and white
+#  -morph value         morph an image sequence
+#  -negate              replace every pixel with its complementary color 
+#  -noise radius        add or reduce noise in an image
+#  -normalize           transform image to span the full range of colors
+#  -opaque color        change this color to the fill color
+#  -page geometry       size and location of an image canvas
+#  -paint radius        simulate an oil painting
+#  -profile filename    add ICM or IPTC information profile to image
+#  -quality value       JPEG/MIFF/PNG compression level
+#  -raise value         lighten/darken image edges to create a 3-D effect
+#  -region geometry     apply options to a portion of the image
+#  -roll geometry       roll an image vertically or horizontally
+#  -rotate degrees      apply Paeth rotation to the image
+#  -sample geometry     scale image with pixel sampling
+#  -scale geometry      resize image
+#  -segment values      segment an image
+#  -seed value          pseudo-random number generator seed value
+#  -shade degrees       shade the image using a distant light source
+#  -sharpen geometry    sharpen the image
+#  -shave geometry      shave pixels from the image edges
+#  -shear geometry      slide one edge of the image along the X or Y axis
+#  -size geometry       width and height of image
+#  -solarize threshold  negate all pixels above the threshold level
+#  -spread amount       displace image pixels by a random amount
+#  -stroke color        color to use when stoking a graphic primitive
+#  -strokewidth value   width of stroke
+#  -swirl degrees       swirl image pixels about the center
+#  -texture filename    name of texture to tile onto the image background
+#  -threshold value     threshold the image
+#  -tile filename       tile image when filling a graphic primitive
+#  -transparent color   make this color transparent within the image
+#  -treedepth value     depth of the color tree
+#  -type type           image type
+#  -units type          PixelsPerInch, PixelsPerCentimeter, or Undefined
+#  -unsharp geometry    sharpen the image
+
+# Author: Andy Adler
+
+function imwrite(fname, p2, p3 ,p4 ,p5 );
+
+try save_empty_list_elements_ok= empty_list_elements_ok;
+catch save_empty_list_elements_ok= 0;
+end
+try save_warn_empty_list_elements= warn_empty_list_elements;
+catch save_warn_empty_list_elements= 0;
+end
+unwind_protect
+empty_list_elements_ok= 1;
+warn_empty_list_elements= 0;
+
+if  ( nargin <= 1 )     || ...
+    ( ! isstr (fname))  || ...
+    ( nargin == 2 && isstr(p2) )
+    usage([ ...
+    "imwrite( fname, img )\n", ...
+    "imwrite( fname, img, map )\n", ...
+    "imwrite( fname, r,g,b );\n", ...
+    "imwrite( fname, img, options )\n", ...
+    "imwrite( fname, img, map, options )\n", ...
+    "imwrite( fname, r,g,b, options );\n"]);
+endif
+
+# Put together the options string
+# TODO: add some error checking to options
+option_str="";
+n_mat= nargin-1;
+
+options= eval(sprintf("p%d",nargin));
+# process options strings if given
+if    isstr(options)
+   n_mat--;
+   for i= 1:size(options,1)
+      option_str=[option_str," ", options(i,:) ];
+   end
+elseif is_list( options )
+   n_mat--;
+   for i= 1:length(options)
+      option_str=[option_str," ", nth(options,i) ];
+   end
+end
+
+[hig,wid] = size(p2);
+if n_mat==1
+   data= p2';
+   outputtype="pgm";
+   pnm_sig="P5";
+elseif n_mat==2
+   img= p2';
+   data= [ 255*reshape(p3(img,1),1, hig*wid);
+           255*reshape(p3(img,2),1, hig*wid);
+           255*reshape(p3(img,3),1, hig*wid) ];
+   outputtype="ppm";
+   pnm_sig="P6";
+elseif n_mat==3
+   data= [ reshape(p2',1, hig*wid);
+           reshape(p3',1, hig*wid);
+           reshape(p4',1, hig*wid) ];
+   outputtype="ppm";
+   pnm_sig="P6";
+else
+   error("imwrite: too many data matrices specified");
+end
+
+#  pname= sprintf("convert %s %s:- '%s' 2>/dev/null",
+#                 option_str, outputtype, fname);
+#  fid= popen(pname ,'w');
+
+   tnam= tmpnam();
+   cmd= sprintf("convert %s '%s:%s' '%s' 2>/dev/null",
+                 option_str, outputtype, tnam, fname);
+   fid= fopen(tnam, "wb");
+   
+#  disp(pname); disp(fid);
+   if fid<0;
+      error(['could not create file: ',tnam]);
+   end
+
+   fprintf(fid,"%s\n%d %d\n255\n",pnm_sig,wid,hig);
+   write_count= fwrite(fid,data(:));
+   if write_count != prod(size(data))
+      fclose(fid); unlink(tnam);
+      error(['Unable to write image: ', fname ]);
+   end
+
+   fclose(fid);
+   [jnk,retcode] = system(cmd);
+   if retcode !=0 
+      error('could not call imagemagick convert');
+   end
+   unlink( tnam );
+
+unwind_protect_cleanup
+empty_list_elements_ok= save_empty_list_elements_ok;
+warn_empty_list_elements= save_warn_empty_list_elements;
+end_unwind_protect
+
+#
+# $Log: imwrite.m,v $
+# Revision 1.6  2003/09/12 14:22:42  adb014
+# Changes to allow use with latest CVS of octave (do_fortran_indexing, etc)
+#
+# Revision 1.5  2003/07/25 19:11:41  pkienzle
+# Make sure all files names referenced in system calls are wrapped in quotes
+# to protect against spaces in the path.
+#
+# Revision 1.4  2002/11/27 08:40:11  pkienzle
+# author/license updates
+#
+# Revision 1.3  2002/03/19 18:14:13  aadler
+# unfortunately using popen seems to create problems, mostly
+# on win32, but also on linux, so we need to move to a tmpfile approach
+#
+# Revision 1.2  2002/03/17 05:26:14  aadler
+# now accept filenames with spaces
+#
+# Revision 1.1  2002/03/11 01:56:47  aadler
+# general image read/write functionality using imagemagick utilities
+#
+#
+
+--------------080601040501070601010704
+Content-Type: text/x-objcsrc;
+ name="in_diff1.m"
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline;
+ filename="in_diff1.m"
+
+function img_new = in_diff1(img)
+
+[n,m] = size(img);
+
+img_new=zeros(n,m);
+
+for i = 1:n-1
+  for j = 1:m-1
+    img_new1(i,j) = ( ( (img(i,j) - img(i+1,j)) + (img(i,j+1) - img(i+1,j+1)) ) / 2 ) ^ 2 ; 
+    img_new2(i,j) = ( ( (img(i,j) - img(i,j+1)) + (img(i+1,j) - img(i+1,j+1)) ) / 2 ) ^ 2 ;
+    img_new(i,j) = sqrt((img_new1(i,j) + img_new2(i,j) ) / 2) ;
+  end
+end
+
+end
+
+--------------080601040501070601010704
+Content-Type: text/x-objcsrc;
+ name="in_diff2.m"
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline;
+ filename="in_diff2.m"
+
+function img_new = in_diff2(img)
+
+[n,m] = size(img);
+img_new=zeros(n,m);
+%img_new(1:n-1,1:m-1) = img(1:n-1,1:m-1) - img(2:n,1:m-1);
+img_new1(1:n-1,1:m-1) = ( ( (img(1:n-1,1:m-1) - img(2:n,1:m-1)) + (img(1:n-1,2:m) - img(2:n,2:m)) ) / 2 ) .^ 2 ;
+img_new2(1:n-1,1:m-1) = ( ( (img(1:n-1,1:m-1) - img(1:n-1,2:m)) + (img(2:n,1:m-1) - img(2:n,2:m)) ) / 2 ) .^ 2 ;
+img_new(1:n-1,1:m-1) = sqrt((img_new1(1:n-1,1:m-1) + img_new2(1:n-1,1:m-1) ) / 2) ;
+
+end
+
+--------------080601040501070601010704
+Content-Type: text/x-objcsrc;
+ name="mono.m"
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline;
+ filename="mono.m"
+
+[r,g,b] = imread("/tmp/test.jpg") ;
+
+%[r,g,b] = imread("/tmp/tmp.bmp") ;
+
+%tic;
+%t1 = mono1(r,g,b);
+%toc
+
+tic;
+t2 = mono2(r,g,b);
+toc
+
+%if(t1==t2) 
+%  disp("succeeded monochrome");
+%else
+%  disp("failed monochrome");
+%end
+
+%tic;
+%t1 = in_diff1(t1);
+%toc
+
+tic;
+t2 = in_diff2(t2);
+toc
+
+%if(t1==t2) 
+%  disp("succeeded intensity diff");
+%else
+%  disp("failed intensity diff");
+%end
+
+imwrite("/tmp/test-new.jpg",give_edge(t2,40));
+
+--------------080601040501070601010704
+Content-Type: text/x-objcsrc;
+ name="mono1.m"
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline;
+ filename="mono1.m"
+
+function img = mono1(r,g,b)
+[n,m] = size(r);
+
+img = zeros(n,m);
+
+for i = 1:n
+  for j = 1:m
+    img(i,j) = 0.3*r(i,j) + 0.6*g(i,j) +0.1*b(i,j);
+  end
+end
+
+--------------080601040501070601010704
+Content-Type: text/x-objcsrc;
+ name="mono2.m"
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline;
+ filename="mono2.m"
+
+function img = mono2(r,g,b)
+[n,m] = size(r);
+img = zeros(n,m);
+img(1:n,1:m) = 0.3*r(1:n,1:m) + 0.6*g(1:n,1:m) +0.1*b(1:n,1:m);
+
+--------------080601040501070601010704
+Content-Type: image/jpeg;
+ name="test.jpg"
+Content-Transfer-Encoding: base64
+Content-Disposition: inline;
+ filename="test.jpg"
+
+/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAMCAgMCAgMDAwMEAwMEBQgFBQQEBQoHBwYIDAoM
+DAsKCwsNDhIQDQ4RDgsLEBYQERMUFRUVDA8XGBYUGBIUFRT/2wBDAQMEBAUEBQkFBQkUDQsN
+FBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBT/wAAR
+CADrAToDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAA
+AgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkK
+FhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWG
+h4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl
+5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREA
+AgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYk
+NOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOE
+hYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk
+5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD7Hh8CadA7yeXI+Rxubp+lUZPh1bNOZVvG
+iXcD5Spkj6GuyuJlKBSQQ3HFV4JVjfkBuK6lVl1LdGD6DNM082YCea8zAYBkHOKnlikhm37F
+b2YZFDXOxflI55z6VDLqsnG5yy9MCo1epo+WKsU9Usoml85IY4ZSPmZBjI9PeucGiT2OoGe2
+xskbBQcCtua880gM3A6cUsFwmQCOh6mtlJpWMXCLdyi0R87MnDZ61pxwoiBgd1OnhW5IkThu
+mO2KHjIhAHb0qL3KSsQyy5GwABc54GKilO5Djg+9McMjZI4zTHuCR6UyWyF2PTmpIJ3RgQcn
+3qvdzkoSCFHfPNUEuJFbh8jpiqUbmLnZnSR3xyS/XpVGa52S7165qBLvzQfX2qGcEk4zU2Ne
+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
+0dC7P//Z
+--------------080601040501070601010704
+Content-Type: image/bmp;
+ name="tmp.bmp"
+Content-Transfer-Encoding: base64
+Content-Disposition: inline;
+ filename="tmp.bmp"
+
+Qk3mBAAAAAAAADYAAAAoAAAAFAAAABQAAAABABgAAAAAALAEAAASCwAAEgsAAAAAAAAAAAAA
+////////////////////////////////////////7u7uvLy8lJSUgoKCioqKqqqq3t7e+/v7
+////////////////////////////////////////////3Nzcf39/PT09FBQUAwMDCgoKKioq
+X19fv7+/9vb2////////////////////////////////////7u7ucXFxERERAAAAAAAAAAAA
+AAAAAAAAAAAAQ0NDzMzM+/v7////////////////////////////////r6+vHx8fAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAfX196+vr////////////////////////////////ZGRkDAwM
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMjIy2dnZ////////////////////////////////
+PT09AwMDAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACgoKz8/P////////////+/v73t7eqqqq
+ioqKgoKCIyMjAgICAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACgoKz8/P////+Pj4wsLCWFhY
+GRkZCQkJAwMDAgICBwcHAwMDAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMjIy2dnZ8PDwmZmZ
+Hh4eBAQEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAfX196+vr
+tra2GhoaAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQ0ND
+zMzM+/v7Y2NjAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwMDCAgIAwMDCgoKKioq
+X19fv7+/9vb2////ISEhAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgICIyMjgoKC
+ioqKqqqq3t7e+/v7////////BAQEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwMD
+PT09////////////////////////////ERERAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAADAwMZGRk////////////////////////////REREAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAHx8fr6+v////////////////////////////mJiYAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAADQ0NcXFx7u7u////////////////////////////4+Pja2trAAAAAAAA
+AAAAAAAAAAAAAAAAAgICJSUlfHx83Nzc/////////////////////////////////f394+Pj
+mJiYQ0NDDw8PAwMDEhISMjIyampqsbGx7u7u////////////////////////////////////
+/////v7+9PT039/f0tLSzs7O1dXV5OTk+Pj4////////////////////////////////////
+////////////////////////////////////////////////////////////////////////
+////////////////
+--------------080601040501070601010704--
+

@@ -1,0 +1,16 @@
+module octave/general/io
+imports 
+  liblib 
+
+strategies
+
+  octave-io-wrap(s1) = 
+    io-wrap(where(initialize-octave-stuff) ; s1)
+  octave-io-wrap(s1,s2) = 
+    io-wrap(s1, where(initialize-octave-stuff) ; s2)
+  octave-xtc-io-wrap(s1) = 
+    xtc-io-wrap(where(initialize-octave-stuff) ; s1)
+  octave-xtc-io-wrap(s1,s2) = 
+    xtc-io-wrap(s1, where(initialize-octave-stuff) ; s2)
+
+

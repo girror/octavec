@@ -1,0 +1,81 @@
+module TC-PartialTypes
+
+
+rules
+
+/* TcIncompleteType: 
+ |[ reshape(e::ts,e1::int,e2::int) ]| 
+ -> |[ reshape(e::ts,e1::int,e2::int)::matrix(t,dim(sh*))]|
+ where <is-partial-type> ts
+	; <GetAType <+ !ANY_TYPE >ts => t
+        ; <GetTypeShape; ?MATRIX(_,<id>) <+ ![SKIP,SKIP] >ts => sh*
+ */
+
+ TcIncompleteType: 
+ |[ fix(e::ts) ]| -> |[ fix(e::ts)::matrix(t,dim(sh*))]|
+ where <is-partial-type> ts
+	; <GetAType <+ !ANY_TYPE >ts => t
+        ; <GetTypeShape; ?MATRIX(_,<id>) <+ ![SKIP,SKIP] >ts => sh*
+
+ TcIncompleteType: 
+ |[ lv::ts {a*} ]| -> |[ (lv:: ts {a*})::matrix(t,dim(sh*))]|
+ where <is-partial-type> ts
+	; <GetAType <+ !ANY_TYPE >ts => t
+        ; <GetTypeShape; ?MATRIX(_,<id>) <+ ![SKIP,SKIP] >ts => sh*
+
+ TcIncompleteType: 
+ |[ lv::ts { 1:: int} ]| -> |[ (lv:: ts {1::int}):: char ]|
+ where <is-partial-type> ts
+	; <GetAType>ts => |[ char ]|
+
+ TcIncompleteType: 
+ |[ lv::ts [a*] ]| -> |[ (lv:: ts [a*])::matrix(t,dim(sh*))]|
+ where <is-partial-type> ts
+	; <GetAType <+ !ANY_TYPE >ts => t
+        ; <GetTypeShape; ?MATRIX(_,<id>) <+ ![SKIP,SKIP] >ts => sh*
+
+
+ TcIncompleteType: 
+ |[ lv::ts [a*] ]| -> |[ (lv:: ts [a1*]):: ts1 ]|
+ where   <fix-colons; map(?Int(_) + ?True + ?False)> a* =>a1*
+	; <GetAType>ts 
+	; !SCALAR(<id>) => ts1
+
+
+ TcIncompleteType: 
+ |[ lv::ts [1::int] ]| -> |[ (lv:: ts [1::int]):: char ]|
+ where <is-partial-type> ts
+	; <GetAType>ts => |[ char ]|
+
+ TcIncompleteType: 
+ |[ e::ts bo e1::ts1 ]| -> |[ (e::ts bo e1::ts1)::matrix(t2,dim(sh*)) ]|
+  where (<is-partial-type >ts <+ <is-partial-type> ts1)
+	; <GetShape>ts =>sh*
+	; <GetAType>ts =>t
+	; <GetAType>ts1
+	; <get-wide-scalar> (t,<id>) => t2
+
+	
+
+ TcIncompleteType: 
+ |[ e::ts bo e1::ts1 ]| -> |[ (e::ts bo e1::ts1)::ts2 ]|
+ where (<is-octave-type>ts <+  <is-octave-type>ts1 ) ; !UNIVERSAL => ts2
+	
+ TcIncompleteType: 
+ |[ e::ts ro e1::ts1 ]| -> |[ (e::ts ro e1::ts1)::matrix(bool,dim(sh*)) ]|
+  where <is-relop>ro ; (<is-partial-type> ts <+ <is-partial-type>ts1)	
+	; GetTypeShape => MATRIX(t,sh*)
+
+ TcIncompleteType: 
+ |[ uo(e::ts) ]| -> |[ uo(e::ts)::ts ]|
+  where <is-partial-type> ts
+
+ TcIncompleteType: 
+ |[ (e::ts) uo ]| -> |[ (e::ts uo)::ts ]|
+  where <is-partial-type> ts
+
+ is-partial-type =
+  where(oncetd(?SKIP + ?UNIVERSAL))
+
+ is-octave-type =
+  GetTypeShape;?UNIVERSAL

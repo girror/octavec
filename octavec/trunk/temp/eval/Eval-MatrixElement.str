@@ -1,0 +1,39 @@
+module Eval-MatrixElement
+rules
+
+ EvalME(s):
+ BinOp(Matrix(ms),op,x) -> Matrix(ms')
+ where <?|[ + ]| + ?|[ - ]|>op
+	; <is-const> Matrix(ms)
+	; <is-scalar> x
+	; <map(map(\m -> <s> BinOp(m,op,x) \ ))> ms => ms'
+
+
+ EvalME(s):
+ BinOp(x,op,Matrix(ms)) -> Matrix(ms')
+ where <?|[ + ]| + ?|[ - ]|>op
+	;<is-const>Matrix(ms)
+        ;<is-scalar> x
+        ;<map(map(\m -> <s> BinOp(x,op,m) \ ))> ms => ms'
+
+ EvalME(s):
+ BinOp(x,op,Matrix(ms)) -> Matrix(ms')
+ where <is-const> Matrix(ms)
+       ;<is-scalar> x
+       ;<map(map(\m -> <s> BinOp(x,op,m) \ ))> ms => ms'
+
+ EvalME(s):
+  BinOp(Matrix(ms),op,x) -> Matrix(ms')
+  where <is-const>Matrix(ms)
+       ;<is-scalar> x
+       ;<map(map(\m -> <s> BinOp(m,op,x) \ ))> ms => ms'
+
+
+ EvalME(s):
+  BinOp(Matrix(mx),op,Matrix(my)) -> Matrix(<bo-zip-matrix(s|op)> (mx,my)) 
+  where <?|[ + ]| + ?|[ - ]|>op
+
+strategies
+
+ bo-zip-matrix(s|bo) =
+  zip(zip( \ (x,y) -> <s>BinOp(x,bo,y) \ ))

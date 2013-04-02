@@ -1,0 +1,228 @@
+module Octave-IncludeTypeInfo
+imports Octave Octave-Joint Octave-Shapes
+	Octave-TypeIncludes 
+	TC-Conversions liblib 
+	octave/xtc
+
+strategies
+
+  io-Octave-IncludeTypeInfo = 
+   io-wrap(typeshape-options, include-types )
+
+
+  typeshape-options =
+    ArgOption("--typespec",        
+      where(<set-config>("--typespec", <id>)),
+      !"--typespec f     Type specification file 'f'")
+
+
+ include-types = 
+   where(collect-builtin-funcs => builtin-funcs) 
+  ;where(read-type-specs(|builtin-funcs) => libfunctions)
+  ; ( Prog(id,id){[update-rename-info] => funcs-renamings} <+ where(![[]] => funcs-renamings ))
+  ; Prog(id,id){ ![(libfunctions, <Hd> funcs-renamings)]}
+
+
+  /**
+   *Collects builtin names of function calls
+   */
+  collect-builtin-funcs =
+   where(collect-all(GetFuncCall) => calls)
+    ; collect(FuncDef)
+    ; <not-def-functions>(<id>,calls)
+
+rules	
+ GetFuncCall: |[f(a*)]|  -> f 
+
+ FuncDef: Function(_,f,_,_) -> f  
+
+ not-def-functions =
+   ?(defs,calls)
+   ; <diff>(calls,<isect> (defs,calls))
+
+
+  /** Read type type specifications
+    * an filter the ones in use
+    */
+  read-type-specs(|builtin-funcs) =
+      (read-type-specs    <+  no-file-type-specs) => user-definitions
+    ; (read-builtin-specs <+  no-file-type-specs) 
+    ; <combine-definitions(|builtin-funcs)>(user-definitions, <id>) 
+    ; desugar-typedef 
+
+
+
+  desugar-typedef =
+   bottomup(try(TypeDesugar))
+ 
+
+  TypeDesugar:
+   SCALAR(ANY_TYPE) -> UNIVERSAL
+
+
+  TypeDesugar:
+   SCALAR(CHAR) -> MATRIX(CHAR,[Int("1"),Int("1")])
+ 
+  TypeDesugar:
+   STRING -> MATRIX(CHAR,[Int("1"),SKIP])
+
+  TypeDesugar:
+   MATRIX(t) ->   MATRIX(t,[SKIP,SKIP])
+
+
+
+
+  update-rename-info =
+    map(try(IncludeDecls))
+
+ 
+  read-type-specs =
+    <get-config> "--typespec"
+  ; read-types-from-file
+  ; set-definitions
+
+  no-file-type-specs =
+   ![Constants([]),Variables([]),LibFuncs([]),MappingFuncs([])]
+
+
+  read-builtin-specs =
+   <xtc-find>"builtin.ti"
+  ; read-types-from-file
+  ; set-definitions
+
+ 
+  read-types-from-file =
+    !FILE(<id>)
+  ; xtc-temp-files(
+        xtc-transform(!"parse-oct-types")
+        ; read-from 
+    )
+
+
+ set-definitions = 
+   ?ProgDecls(constants,variables,funcs,mappings,decls)
+    ; try(<var-decls>decls) 
+    ; <get-variables> variables => vars
+    ; <get-functions> funcs => func-signatures
+    ; <get-mappings-functions> mappings => func-mappings
+    ; <get-constants> constants
+    ; ![<id>, vars, func-signatures, func-mappings]
+
+
+  get-constants = 
+   ?[<id>] <+ !Constants([])
+
+  get-variables= 
+   ?[<id>] <+ !Variables([])
+
+  get-functions =
+   ?[<id>] <+ !LibFuncs([])
+
+  get-mappings-functions =
+   ?[<id>] <+ !MappingFuncs([])
+
+
+  combine-definitions(|builtin-funcs) =
+   zip(conc-constants <+ conc-variables 
+	<+ combine-lib-funcs(|builtin-funcs) <+ combine-mappings(|builtin-funcs) 
+      )
+
+  conc-constants =
+   (?Constants(<id>),?Constants(<id>))
+   ; !Constants(<conc>)
+
+  conc-variables =
+   (?Variables(<id>),?Variables(<id>))
+   ; !Variables(<conc>)
+
+ 
+ /**
+  * Combine function type specifications
+  * and filters the functions types in use
+  */
+ combine-lib-funcs(|builtin-funcs) =
+  (?LibFuncs(<id>),?LibFuncs(<id>))
+  ; conc
+  ; <builtin-funcs-in-use>(<id>, builtin-funcs)
+  ; where(check-right-wildcards )
+  ; !LibFuncs(<id>)
+
+ /**
+  * Combine function type specifications
+  * and filters the functions types in use
+  */
+ combine-mappings(|builtin-funcs) =
+  (?MappingFuncs(<id>),?MappingFuncs(<id>))
+  ; conc
+  ; <builtin-funcs-in-use>(<id>, builtin-funcs)
+  ; where(check-right-wildcards) 
+  ; !MappingFuncs(<id>)
+
+
+
+  builtin-funcs-in-use = 
+   ?(type-defs, functions-used) 
+   ; <filter( \f@FunctionSig(n,_,_) -> f where <elem>(n,functions-used) \  )>type-defs
+
+
+
+
+ /** 
+  * Check no wildcars in returining type shape
+  */
+ check-right-wildcards =
+  map(FunctionSig(id,id,check-no-wildcards)
+	 <+ ?FunctionSig(<id>,_,_);<fatal-error> ["not accepted wildcards in returning types -->",<id>])
+
+
+
+ check-no-wildcards =
+  map(not(?NUMERIC() + ?MANY(_) + ?ONE_MANY(_) + ?UNIVERSAL() ))
+
+
+
+ /**
+  * Rename type declarationss
+  * to match renamed functions
+  */
+ var-decls  =
+   ?[Decls(<id>)]
+  ; map( \FunctionDeclaration(f,args,ds) -> ()
+	 where
+	  rules(
+            IncludeDecls:+ 
+	     Func(g,fs,vn,bs,slot) -> Func(g, fs, vn, bs, ds') 
+	     where  <check-function-names> ([f],[g|fs])
+		 ; <rename-vars> (vn, ds)
+		 ; <instantiate-vars>(bs,<id>) => ds'
+
+	    )
+      \ )
+	
+
+  check-function-names= 
+    isect; not([])
+ 
+  rename-vars =
+   {| Rename:
+      where(Fst;  map(RenameVar))
+    ; Snd 
+    ; topdown(try(Rename))
+   |}
+
+
+  RenameVar:
+  (x, y ) -> () 
+  where rules(Rename: x -> y) 
+
+  instantiate-vars =
+   {| Instantiate:
+      where(Fst;  map(InstantiateVar))
+    ; Snd 
+    ; topdown(try(Instantiate))
+   |}
+
+
+  InstantiateVar:
+  (x, e ) -> () 
+  where rules(Instantiate: Var(x) -> e)

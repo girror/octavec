@@ -1,0 +1,253 @@
+module octave/lang/expression
+imports octave/lang/cons/-
+strategies
+
+
+ control-flow =
+    oncetd(?If(_,_,_)  + ?IfThen(_,_) + ?While(_,_) +
+	   ?For(_,_,_) + ?Call(_,_) )
+
+
+
+strategies
+
+ /**
+  * Replace element in list
+  */
+ replace-element =
+   (string-to-int,id,id)
+  ; ?(indx, e, es)
+  ; <nzip(try(?(indx,_);!(indx,e) ) )>es 
+  ; unzip
+  ; Snd
+
+
+
+/**
+  * This stragegy builds a range of integer
+  * elements, it requires a top number
+  * to avoid to build huge matrices
+  * a way to restrict is by using
+  * under-matrix-limit
+  
+
+ range-integers =
+  (try(string-to-int), try(string-to-int), try(string-to-int))
+ ; ?(i,s,l) 
+ ;!i
+ ; downto-step(|s,l)
+ ; ?ls 
+ ; <length>ls 
+ ; under-matrix-limit 
+ ; <reverse>ls 
+ ; map(!Int(<int-to-string>))
+   
+
+
+ under-matrix-limit =
+    !(<try(string-to-int)>, <unroll-limit>)
+  ; leq
+*/
+ 
+ 
+ create-row(|val) =
+  upto; map(\_ -> val\)
+
+ create-row-zeros =
+  create-row(||[0]|)
+
+ create-row-ones =
+  create-row(||[1]|)
+
+ 
+ replicate-row =
+  {x,row:
+   (string-to-int, id)
+  ;?(x, row)
+  ;<dec; upto> x 
+  ; map(\_ -> row \ )
+  }  
+
+
+
+  get-element =
+  {indx, xs,xs':
+   (try(string-to-int),id)
+   ; ?(indx,xs)
+   ; <nzip(id)> xs => xs'
+   ; <index>(indx, xs')
+   ; Snd
+  }
+
+  get-cols =
+  {indx, xss,xss':
+    (try(string-to-int),id)
+   ;?(indx,xss)
+   ;<map(\x -> <get-col>(indx,x) \)>xss =>xss'
+   ;<matrix-transpose>[xss'] =>res'
+  } 
+
+ get-row = get-element
+ get-col = get-element
+
+
+ //fieldvars strategies
+
+  build-fieldvar =
+   ?vf
+  ; <string-tokenize> (['.'],<Fst>vf)
+  ; at-end(![<Snd>vf])
+  ; !(<Hd>,<Tl;reverse>)
+  ; ?(var,fs)
+  ; <foldr(!Var(var), \(f,v) -> FieldVar(v,f) \ )>fs
+
+  tuple-fieldvar =
+   <string-tokenize> (['.'],<Fst>)
+   ; !(<Hd>,<Tl;reverse>) 
+   ; ?(var,fs)
+   ; <foldr(!Var(var), \(f,v) -> FieldVar(v,f) \ )>fs
+
+
+// some side effect testing strategies
+
+ 
+
+ isSideEffect = isPreEffect + isPostEffect
+
+ isPreEffect  = ?|[ ++e1 ]| + ?|[ --e1 ]|  
+
+ isPostEffect = ?|[ e1++ ]| + ?|[ e1-- ]| 
+
+
+ split-rows =
+   map(map(ArgToTemp);unzip);
+   unzip => (asgs, vars);
+   <unions> asgs => as;
+   !(as,vars)
+
+ ArgToTemp :
+  |[ e ]| ->  (Silent(|[ x = e ]|), |[ x ]|)
+    where new => x
+
+
+ do-lift-expr =
+   ?Subscript(_,_) + ?FieldVar(_,_) + ?CellIndex(_,_) + ?BinOp(_,_,_)
+
+ IsEffect = ?Stats(_) + ?Assign(_,_,_) + ?Silent(_)
+
+ isScalarExp = 
+   ?Int(_) + ?Float(_) + ?String(_) + ?True() + ?False() + Constant("i")
+  
+
+ isExpression =  isSimpleExp + is-complex + ?Call(_,_)
+
+
+ isSimpleExp = 
+   ?Int(_) + ?Float(_) + ?String(_) + ?True() + ?False()
+   + ?Constant("i")    
+   + ?Matrix(_) + ?Cell(_)
+   + isLValue
+
+ is-complex = 
+  Constant("i") <+ BinOp(id,isSimpleExp, isSimpleExp)
+
+  not-struct-exp =
+    isScalarExp 
+  + is-complex
+  + ?String(_) 
+  + ?Matrix(_) 
+  + ?Cell(_) 
+  + ?FieldVar(_,_)
+  + ?CellIndex(_,_)
+
+ isLValue =
+   ?Var(_) + ?Subscript(_,_) + ?FieldVar(_,_) + ?CellIndex(_,_)
+
+
+
+// constant testing strategies
+
+ is-const-scalar =
+     is-scalar  
+   + True
+   + False
+
+
+ is-const =
+     Constant(id)
+   + is-const-scalar
+   + String(id)
+   + is-const-matrix
+   + is-const-cell
+
+
+ is-const-matrix =
+   ?Matrix(ms)
+  ;where(<not(oncetd(?Var(_) + ?Call(_,_)))>ms)
+
+ is-const-cell =
+   ?Cell(cs)
+  ;where(<not(oncetd(?Var(_) + ?Call(_,_)))>cs)
+
+ is-scalar-num = 
+   ?Int(_) + ?Float(_) + ?Constant("i") +  ?BinOp(_,_,Constant("i")) + ?Inf()
+
+
+ is-scalar =
+    is-scalar-num + ?NaN()
+
+  eval-relop(s) =
+    s ; !True() <+ !False()
+
+
+  is-relop = 
+    ?|[ < ]| + ?|[ <= ]| + ?|[ > ]| + ?|[ >= ]| + ?|[ == ]| + ?|[ != ]| 
+
+  //Bool strategies
+
+  is-true =
+    where(not(?Matrix(_)) )
+   ; (?|[ true ]| <+ ( not(is-false); is-const))
+   
+  is-false =
+   ?|[ false ]| <+ ?|[ 0 ]| <+ ?|[ 0.0 ]| // <+ ?|[ 0 i ]| 
+   
+
+
+  eval-strings =
+     map(\String(x) -> x\)
+   ; concat-strings
+
+strategies
+
+  is-value =
+    Int(id) 
+  + Float(id) 
+  + String(id) 
+  + FcnHandle(id) 
+  + AnonFcnHandle(id,id,id)
+  + True
+  + False
+
+strategies
+
+  dr-ignore-rules-state(s|names) =
+     where(
+	 <dr-new-rule-sets>names
+       ; dr-switch-rule-sets(|names) => rss
+     )
+     ; s
+     ; where(<dr-set-rule-sets(|names)> rss)
+
+
+  dr-new-rule-sets =
+    map(dr-new-rule-set)
+
+  dr-switch-rule-sets(|names) =
+    <zip({?(rs,name); <dr-switch-rule-set(|name)>rs})>(<id>,names)
+
+  dr-set-rule-sets(|names) =
+   <zip({?(r,name); <dr-set-rule-set(|name)> r})>(<id>,names)
+
+
+ 

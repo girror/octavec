@@ -1,0 +1,52 @@
+module octave/general/xtc
+imports 
+  liblib 
+  octave/interpreter/common
+
+strategies
+
+  octave-front-end =
+    if <get-config>"--dld" then
+      octavec-tool(|"pack-octave",["--single"],"Packing single Octave function",1,"pack")
+    else
+      octavec-tool(|"pack-octave","Packing Octave code",1,"pack")
+    end
+    ; octavec-tool(|"eliminate-side-effects","Eliminating side effects",2,"elim")
+    ; if <get-config>"--no-chek" then
+        octavec-tool(|"octave-format-checker","Performing format check on AST",3,"fc")
+      end
+
+  octave-opt(unroll-options) =
+    octavec-tool(|"partial-evaluation","Partial evaluation",2,"pe")
+  ; octavec-tool(|"clean-ast","Cleaning up AST",3,"clean")
+
+  octave-typeshape(eval-options, tc-options) = 
+    octavec-tool(|"infer-types","Inferring types by type specialization",2,"ti")
+  ; octavec-tool(|"calculate-max-types","Calculate maximum of types",2,"tmax")
+  ; octavec-tool(|"dead-function-elimination","Remove dead functions",2,"dfe")
+
+
+  octavec-tool(|tool,msg,lvl,ext) =
+    log(|Notice(),msg)
+  ; xtc-transform(!tool,pass-verbose)
+  ; save-as(|lvl,ext)
+ <+ <fatal-error>[]
+
+  octavec-tool(|tool,extra,msg,lvl,ext) =
+    log(|Notice(),msg)
+  ; xtc-transform(!tool,![extra|<pass-verbose>])
+  ; save-as(|lvl,ext)
+ <+ <fatal-error>[]
+
+
+  save-as(|ext) = 
+    where(
+      xtc-transform(!"pp-aterm")
+    ; copy-to(<concat-strings>[<get-config;remove-extension>"-i",".oci.", ext] => file1)
+    ; log(|Notice(),<concat-strings> ["AST written to `", file1, "'"])
+    )
+
+  save-as(|lvl,ext) = 
+    if <geq>(<get-config>"--keep",lvl) then
+      save-as(|ext)
+    end

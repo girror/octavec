@@ -1,0 +1,11 @@
+module Translate-Operators
+
+
+rules
+ 
+  TransOp: PLUS  -> ADD
+  TransOp: MINUS -> SUB
+  TransOp: MUL   -> MULS
+  TransOp: DIV   -> DIVS
+
+

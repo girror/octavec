@@ -1,0 +1,67 @@
+module Eval-Records
+overlays
+  CONSTR = "Record"
+
+rules
+ 
+	
+ EvalFV:
+  FieldVar((v, Record(rs)), f) -> res
+  where <get-record-field> (Record(rs),[f]) => value
+	; <EvalFieldVar(|v,f)> value => res
+
+ EvalFieldVar(|v,f) :
+  Record(rs) -> (fv , Record(rs))
+  where <not(?[])> rs
+	;<concat-strings> [v,".",f] => fv
+
+ EvalFieldVar(|v,f) :
+  val ->  <build-fieldvar>(v,f)
+  where <?() + ?Record([])> val
+	
+ EvalFieldVar(|v,f) :
+  val -> val
+  where <not(?())> val
+	; <not(?Record(_))> val
+
+
+strategies
+
+
+// To parameterize Record-Lib
+
+  get-record-field =
+    get-rose-element(|CONSTR)
+
+  create-record =
+    create-record(|CONSTR)
+
+  insert-val-in-record(|val) =
+       (try(GetPath), id)
+     ; insert-elem-in-record(avoid-terms|CONSTR, val)
+
+
+  avoid-terms =
+   not(?Record(_))
+
+  delete-in-record =
+    (delete-in-rose-tree(|CONSTR) 
+     <+ remove-father-if-empty 
+     <+ undefine-global-record
+    )
+    
+
+ remove-father-if-empty =
+ { path :
+     ?(path,record)
+  ; <get-record-field> (path,record)
+  ; (?Record([])<+ avoid-terms)
+  ; <delete-in-rose-tree(|CONSTR)> (path,record)
+ }
+
+
+ undefine-global-record =
+    Fst
+  ; get-root-record
+  ; undefine-rule-Value
+  

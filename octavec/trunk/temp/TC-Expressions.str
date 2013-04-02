@@ -1,0 +1,194 @@
+module TC-Expressions
+//imports output-control
+
+rules
+
+  TcExpPrefer:
+   g@|[ global x ]| -> g 
+  where (<IsGlobal>|[ x ]| <+  rules( IsGlobal : |[ x ]|) ) 
+
+  TcExpPrefer:
+  |[ true ]| -> |[ true :: bool ]|
+
+  TcExpPrefer:
+  |[ false ]| -> |[ false :: bool ]| 
+
+
+  TcExpPrefer:
+  NaN -> NaN{SCALAR(INT())}
+
+  TcExpPrefer:
+  Inf -> Inf{SCALAR(INT())}
+
+  TcExpPrefer:
+   |[ i ]| -> |[ i :: int ]| 
+   
+  TcExpPrefer:
+   |[ r ]| ->|[ r :: float ]|
+
+/** XXXXXX
+  // a + bi :: complex
+  TcExpPrefer:
+    |[ e :: ts + (e1 :: ts1 i) ]| -> |[ e :: ts + e1 :: ts1 i::complex ]| 
+   where <|[ int ]|  + |[ float ]| + |[ complex ]|> ts
+	; <|[ int ]| + |[ float ]| + |[ complex ]|> ts1
+
+  // a - bi :: complex
+  TcExpPrefer:  
+    |[ -(e ::ts , e1 ::ts1 i) ]| -> |[ -(e :: ts, e1 :: ts1 i)::complex ]| 
+   where  <|[ int ]| + |[ float ]| + |[ complex ]|> ts
+	; <|[ int ]| + |[ float ]| + |[ complex ]|> ts1
+*/
+
+  // bo :: complex * _ -> complex
+  // bo ::  _ * complex -> complex
+  TcExpPrefer:  
+    |[ e ::ts bo e1 ::ts1 ]| -> |[ (e :: ts bo e1 :: ts1) :: complex ]| 
+   where   <get-scalar>ts =>t
+	 ; <get-scalar>ts1=> t1
+	 ; (<?|[complex]|>t <+ <?|[complex]|>t1)
+
+  TcExpPrefer:  
+    |[ e ::ts && e1 ::ts1 ]| -> |[ (e :: ts && e1 :: ts1) :: bool ]| 
+
+
+  // bo :: bool * bool -> int
+  TcExpPrefer:
+   |[  e :: ts bo e1 :: ts ]| -> |[ (e ::ts bo e1 :: ts) :: int ]|
+   where <get-scalar>ts => |[ bool ]| 
+
+/* XXXXXXXXXXXX
+  // 6i:: complex (imaginary part)
+  TcExp: 
+   |[ e ::ts i ]| ->  |[ (e ::ts i) :: complex ]| 
+*/
+  TcExp:
+   String(s) -> String([s]){|[ matrix(char,dim(1,1)) ]|}
+   where <is-string>s
+
+  TcExp:
+   String(s) -> String(s){|[ matrix(char,dim(1,i)) ]|}
+   where <length;int-to-string>s => i
+
+  TcExp:
+   |[ (:) ]| -> |[ (:) :: matrix(int,dim(sh*)) ]|
+   where ![Int("1"),SKIP] => sh*
+
+//  TcExp:
+//   |[ nil ]| -> |[ nil]| {Dummy}
+
+
+  /* UNOPS*/
+  TcExp:
+   |[ ( e :: ts) uo ]| -> |[ ( e :: ts) uo :: ts ]| 
+  where <get-scalar>ts; <?|[ ' ]| + ?|[ .' ]|>uo
+
+  TcExp:
+   |[ ( e :: ts) uo ]| -> |[ ( e :: ts) uo :: matrix(t,dim(sh1*)) ]| 
+  where  <?|[ ' ]| + ?|[ .' ]|>uo
+	; <GetTypeShape> ts => |[matrix(t,dim(sh*))]|
+	; !sh* =>[r,c]
+	; ![c,r] => sh1*
+
+  TcExp:
+   |[ !( e :: ts) ]| -> |[ ( !( e ::ts) ):: bool ]| 
+  where <get-scalar>ts
+
+  TcExp:
+   |[ !( e :: ts) ]| -> |[ ( !( e :: ts) ):: matrix(bool,dim(sh*)) ]| 
+  where <GetTypeShape>ts => |[matrix(t,dim(sh*))]|
+
+  TcExp:
+   |[ -( e :: ts) ]| -> |[ ( -( e ::ts) ):: ts ]| 
+  where <get-scalar>ts
+
+  TcExp:
+   |[ -( e :: ts) ]| -> |[ ( -( e :: ts) ):: matrix(t,dim(sh*)) ]| 
+  where <GetTypeShape>ts => |[matrix(t,dim(sh*))]|
+
+
+  TcExp :
+    |[ uo( e :: ts ) ]| -> |[ ( uo( e :: ts ) ) :: ts ]|
+      where
+        <?|[ -- ]| + ?|[ ++ ]|>uo
+
+  TcExp :
+    |[ ( e :: ts ) uo ]| -> |[ ( ( e :: ts ) uo ) :: ts ]|
+      where
+        <?|[ -- ]| + ?|[ ++ ]|>uo
+
+
+  /* BINOPS FOR SCALARS */
+
+
+  TcExp:
+   |[  e :: ts / e1 :: ts1 ]| ->   |[  ( e :: int / e1 :: int) :: float ]|
+   where  <get-scalar> ts => |[ int ]|
+        ; <get-scalar> ts1 => |[ int ]|
+
+  TcExp:
+   |[ e :: ts / e1 :: ts1 ]| -> |[ (e::ts / e1::ts1) :: float ]|
+   where <get-scalar>ts  => t
+	 ; <get-scalar>ts1
+	 ; <get-wide-scalar> (t,<id>) => t4; ?|[float]|
+
+  TcExp:
+   |[ e :: ts bo e1 :: ts ]| -> |[ (e ::ts bo e1 :: ts) :: ts ]|
+   where <not(?|[ / ]|)> bo 
+	; <get-scalar>ts 
+	; not(?|[complex ]|) 
+
+
+// change xxxxxx
+
+  TcExpPrefer:
+   |[ e :: t bo e1 :: t1 ]| -> |[ (e::t bo e1::t1) :: ts4 ]|
+   where  <not(?|[ / ]|)> bo
+	; <get-wide-scalar> (t,t1) 
+	; !SCALAR(<id>) => ts4 
+
+  TcExp:
+   |[e :: ts bo e1 :: ts1 ]| -> |[ (e::ts bo e1::ts1) :: ts4 ]|
+   where  <not(?|[ / ]|)> bo
+        ; ( <is-scalar-type>ts ; <is-matrix-type>ts1 
+          + <is-matrix-type>ts ; <is-scalar-type>ts1 )
+	; <get-scalar>ts  => t
+	; <get-scalar>ts1 => t1
+	; <get-wide-scalar> (t,t1)
+	; !MATRIX(<id>,[Int("1"),Int("1")]) => ts4 
+
+
+  TcExpPrefer:
+   |[ e :: ts ro e1 :: ts1 ]| -> |[ ( e:: ts ro e1 :: ts1) :: bool]|
+   where <is-relop>ro 
+        ; <get-scalar> ts 
+	; <get-scalar> ts1 
+
+  TcExp:
+   |[ (e :: ts : e1 :: ts1 : e2:: ts2) ]| -> |[ (e::ts : e1::ts1 : e2::ts2) :: ts5 ]|
+   where <GetAType> ts => t3
+	; <GetAType> ts1 => t4
+	; <GetAType> ts2 => t5
+	; <INT + FLOAT> t3; <INT + FLOAT> t4
+	; <get-wide-scalar> (t3,t4) => t5
+	; !RANGE(t5,[Int("1"),SKIP]) => ts5
+ 
+
+  TcExp:
+   |[(e::ts : e1::ts : e2::ts2)]| -> |[(e::ts : e1::ts :e2::ts2)::ts3]|
+  where  <GetAType> ts => |[int ]|
+	; !RANGE(INT,[Int("1"),SKIP]) => ts3
+ 
+  TcExp:
+   |[ (e :: ts : e1 :: ts : e2:: ts) ]| ->
+	 |[ (e :: ts : e1 :: ts : e2:: ts) :: ts1 ]|
+  where <get-scalar>ts => t
+	; <range-shape <+ !RANGE(t,[Int("1"),SKIP])>(|[(e:e1:e2)]|, t) => ts1
+
+ 
+ range-shape =
+  ?(|[(i:j:k) ]|,t)
+  ; <"1">j
+  ; <gtS>(k,i)
+  ; <addS>(<subtS>(k,i),"1")
+  ; !RANGE(t,[Int(j),Int(<id>)])

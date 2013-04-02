@@ -1,0 +1,39 @@
+module Frames 
+imports INSN
+
+signature
+  constructors
+   Stack : Id -> ILoc   
+   FramePointer: Id -> ILoc
+ overlays
+ 
+  WordSize = 4 // parameterize
+  FPointer = LOC("$fp", WORD) 
+  SPointer = LOC("$sp", WORD) 
+
+rules
+
+
+// Frames and static links
+
+  DeclareFrame :
+    FunctionDec(out, f, args, e) -> 
+	FunctionDec(out, f, args, e)
+
+//	FunctionDec(out, f, [Stack("_sl") | args], e)
+    where (Frames <+ ![] )=> fs; <subt>(0,WordSize) => l;
+      rules(
+        Frames  : _ -> [(f,Int(0)) | fs]
+        Offset : _ -> l
+      )
+
+  CurrentFrame =
+    Frames; Hd; Fst
+
+  static-link = ?g;
+    Frames; 
+    take-until(?(g,_))
+    //foldr(!FramePointer, !LOC(DATA(PLUS, [<Snd>], [<Fst;Snd>])))
+
+
+

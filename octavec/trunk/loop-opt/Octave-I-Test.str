@@ -1,0 +1,129 @@
+module Octave-I-Test
+imports 
+  liblib 
+  liboctavec
+signature
+  constructors
+    DEP    : Constraint
+    NO-DEP : Constraint
+    
+strategies
+
+  i-test = debug(!"INPUT ITEST: ");
+    ? (coeff,outcome,stride)
+    ; <get-prediction(| stride)>(coeff,outcome,outcome)
+
+    
+  get-prediction(| stride) = 
+    ? (coeff,L,U)
+    ; <add-range>(<subt-range>(U,L),1) => condition
+    ; <filter({i,j: ?(i,j); <leq;!(i,j)>(<abs>i,<Hd>condition)})> coeff => list
+    ; if <?[]>list then <try-maybe(| stride)>(coeff,L,U)
+      else <reduce(| stride)>(<Hd>list,L,U,coeff)  
+      end 
+
+  add-range = 
+    ? (a,b)
+    ; <map(<add>(<id>,b))> a
+
+  subt-range =
+      zip
+    ; map(\ (a,b) -> <subt>(a,b) \)
+
+  try-maybe(| stride) = 
+    ? (coeff,L,U)
+    ; if <? [_]> U then no-range-maybe(| coeff,L,U,stride)
+      else !DEP
+      end
+  
+  no-range-maybe(| coeff,L,U,stride) = 
+      <? [<id>]> U => u
+    ; <? [<id>]> L => l
+    ; <map(Fst)> coeff
+    ; gcd-more => d
+    ; <divr>(l,d)
+    ; try(get-int) => round
+    ; <mul>(<int>round, d) => condition
+    ; if <not(leq-leq)>(l,condition,u) then !NO-DEP
+      else if <(?1)> d then !DEPENDENCE
+           else <divide-gcd(| stride)>(coeff,l,u,d)
+           end
+      end
+
+  divide-gcd(| stride) = 
+    ? (coeff,L,U,d)
+    ; <map(\ (a,b) -> (<div>(a,d),b) \)>coeff => new-coeff
+    ; <divr>(L,d)
+    ; try(get-int) 
+    ; int => newL
+    ; <divr>(U,d)
+    ; int => newU
+    ; <get-prediction(| stride)>(new-coeff, [newL], [newU])
+
+  get-int =
+    ? mx 
+    ; <subt> (<real>mx ,<int> mx)
+    ; not(? 0.00) 
+    ; <addr>(mx,1)
+
+  reduce(| stride) = 
+    ? ((i,j),L,U,coeff)
+    ; <add-range>(<subt-range2>(L, <mul>(<pls>i,j)), <mn>i) => newL
+    ; <add-range>(<subt-range2>(U, <pls>i), <mul>(<mn>i,j)) => newU
+    ; <partition(?(i,j))>coeff => (a,b)
+    ; if <length>a ; <gt>(<id>,1)
+      then <at-last(![])> a => coefftemp 
+         ; <conc>(b,coefftemp) => new-coeff
+      else !b => new-coeff
+      end
+    ; if <?[]> new-coeff
+      then <precise(| stride)>(newL,newU)
+      else <get-prediction(| stride)>(new-coeff,newL,newU)  
+      end 
+
+  subt-range2 =
+    ? (a,b)
+    ; <map(<subt>(<id>,b))> a
+
+  precise(| stride) = 
+    ? (L,U)
+    ; <Hd> U 
+    ; if not(neg)
+      then ?up; <Hd> L => lo
+      else <compute-indices(| stride)> (L,U) => (lo,up)
+      end
+    ; if <leq-leq>(lo,0,up) then !DEPENDENCE else !NO-DEP end
+
+  compute-indices(| stride) = 
+    ? (L,U)
+    ; <Hd> U => u
+    ; if <geq>(<try(string-to-int)>stride,0)
+      then <divr>(<abs>u,stride) => val
+         ; <subtr>(val,<int>val)
+	 ; ( (? 0.00; <int>val) <+  <int>(<addr>(val,1)) ) => i  
+	 ; <add>(u,<mul>(i,stride)) => pos
+	 ; <get-value(| i,pos,stride)> (L,U) 
+      else debug(!"NEGATIVE STRIDE: ") ; !DEPENDENCE
+      end
+  
+  get-value(| i,pos,stride) = 
+    ? (L,U)
+    ; <reverse; Hd>U => u
+    ; if <gt>(pos,u)
+      then !(1,1)
+      else <add>(<Hd>L,<mul>(i,stride)) => lo
+	 ; !(lo,pos)
+      end
+      
+  gcd-more = 
+    foldr(!0,gcd)
+
+  pls = 
+    ? a
+    ;( (<geq>(a,0) ; !a )
+      <+ !0 )
+     
+  mn = 
+    ? a
+    ;( (<geq>(a,0) ; !0 )
+      <+ <subt>(0,a) )

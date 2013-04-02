@@ -1,0 +1,66 @@
+module octave/o2c/struct-cell
+
+
+rules
+
+  TranslateStructAssignment(exp) :
+    |[ lv.x = e ]| -> 
+      stm |[ ~exp:<exp>lv .assign(~str:<double-quote>x,octave_value(~exp:<exp>e)) ;  ]|
+
+  TranslateCell(exp) :
+    e@Cell(_) -> exp |[ y ]| 
+      where 
+        new => y
+      ; <?Cell(<get-matrix-dimensions>)>e => (r,c)
+      ; <cell-to-assignments(exp|Var(y))>e => stmts
+      ; ![ dec |[ Cell y ; ]| | stm* |[ y = Cell(~int:r,~int:c,octave_value()) ; ~stm*:stmts  ]| ] => tm
+      ; rules( init-stats :+ _ -> tm )
+
+  TranslateCell(exp) :
+    CellIndex(lv,es) -> exp |[ ~exp:<exp>lv.cell_value().index(x)(0) ]|
+    where 
+      new => x
+    ; ![  dec |[ octave_value_list x ; ]| | <map(exp);list-to-ov-list(|x)>es ] => e1
+    ; rules( init-stats :+ _ -> e1 )
+    
+  TranslateCellAssignment(exp) :
+    |[ ~lv {~*es} = e ]| -> 
+      stm |[ { 
+               octave_value_list y ;
+               ~stm*:s 
+               ~exp:<exp>lv .assign(y,octave_value(~exp:<exp>e),octave_value()) ;
+             }
+          ]|
+      where 
+        new => y
+      ; <map(exp);list-to-ov-list(|y)>es => s
+
+  TranslateCellAssignment(exp) :
+    |[ ~lv = ~v {~*es} ]| -> 
+      stm |[ { 
+               octave_value_list y ;
+               ~stm*:s 
+               ~id:<exp>lv = ~exp:<exp>v. cell_value() .index(y)(0) ;
+             }
+          ]|
+      where 
+        new => y
+      ; <map(exp);list-to-ov-list(|y)>es => s
+
+  TranslateCellAssignmentPrefer(exp) :
+    |[ ~lv1 {~*es1} = ~lv2 {~*es2} ]| -> 
+      stm |[ { 
+               octave_value_list y ;
+               octave_value_list x ;
+               ~stm*:ss
+               ~exp:<exp>lv1 .assign(y,octave_value(~exp:<exp>lv2 .index(x)(0)),octave_value()) ;
+             }
+          ]|
+      where 
+        new => y
+      ; new => x
+      ; <map(exp);list-to-ov-list(|y)>es1 => s1
+      ; <map(exp);list-to-ov-list(|x)>es2 => s2
+      ; <conc>(s1,s2) => ss
+
+

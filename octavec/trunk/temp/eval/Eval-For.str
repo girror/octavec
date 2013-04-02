@@ -1,0 +1,56 @@
+module Eval-For
+
+strategies
+  unroll-loop-1(s) =
+    ?For(iv,_, body)
+   ;<topdown(try(?iv;!Int("1")))>body
+   ; s
+
+
+
+ /** Unrrolls a loop */
+  //:: For:Exp -> Stats:Exp
+  unroll-loop-m(s) =
+  {ms,iv:
+     ?For(iv, Matrix([ms]), body)
+   ; <map(\Int(i) -> <replace-iv(|iv)>(body, Int(i)) \ )>ms
+   ; s
+   ; !Stats(<id>)
+  }
+
+
+  // Exp * Int -> Exp
+   replace-iv(|iv) =
+    {| ReplIV:
+       ?(body, iv-value)
+     ; rules (ReplIV : iv -> iv-value)
+     ; <topdown(try(ReplIV))> body
+    |}
+
+  get-maxlimit =
+  <get-config> "--limit" <+ !1000
+
+  rules
+
+ // UnrollLoop(s):
+ // |[ for x = 1:1:k do e end ]| -> <unroll-loop-1(s)>
+
+
+
+  UnrollLoop(s):
+  For(v,Matrix([m]),b) -> 
+	<unroll-loop-m(s)>For(v,Matrix([m]),b)
+  where get-maxlimit => l
+	; <lt>(<length> m, l)
+	; <map(?Int(_))> m
+
+  UnrollLoop(s):
+  For(v,Matrix([[Int("1")]]),b) -> 
+	<unroll-loop-1(s)>For(v,Matrix([[Int("1")]]),b) 
+
+  UnrollLoop(s):
+  For(v,Int("1"), b) -> 
+	<unroll-loop-1(s)>For(v,Int("1"),b)
+
+ 
+ 

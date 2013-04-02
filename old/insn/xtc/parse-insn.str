@@ -1,0 +1,11 @@
+module parse-insn
+imports xtc-lib stratego-xt-xtc-tools
+
+strategies
+  
+  io-parse-insn =
+    xtc-io-wrap(
+      xtc-sglr(!"INSN.tbl")
+    ; xtc-implode-asfix
+    )
+

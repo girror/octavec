@@ -1,0 +1,229 @@
+/** 
+ * Generic forward propagation strategy for Octave
+ */
+module octave/forward-propagation
+imports 
+  dynamic-rules-utils
+strategies
+
+  /**
+   * Generic forward data-flow propagation strategy.
+   *
+   * @param before    : before recognizing the construct
+   * @param transform : transform it to something after doing the initial traversal
+   * @param recur     : recursive invocation of the traversal
+   * @param after     : after doing the generic thing for the construct
+   * @param Rs1       : list of rulenames to be intersected
+   * @param Rs2       : list of rulenames to be unioned
+   * @param Rs3       : list of rulenames without data-flow 
+   *                    (no merges or kills, only scopes)
+   */
+
+  forward-prop(transform, before, recur, after | Rs1, Rs2, Rs3) = 
+    let fp(transform, before, recur, after | Rs1, Rs2, RsSc, RsDF) = 
+           ( transform
+	     <+ (  forward-prop-for    (transform, before, recur, after | Rs1,Rs2,RsSc)
+	        <+ forward-prop-funcdec(transform, before, recur, after | RsSc)
+		<+ forward-prop-prog   (transform, before, recur, after | RsSc)
+                <+ forward-prop-assign (transform, before, recur, after | RsDF)
+                <+ forward-prop-if     (transform, before, recur, after | Rs1, Rs2)
+                <+ forward-prop-while  (transform, before, recur, after | Rs1, Rs2)
+	        <+ forward-prop-call   (transform, before, recur, after | RsSc)
+               )
+             <+ before; all(recur); after 
+	   )
+     in fp(transform, try(before), recur, try(after)
+          | Rs1, Rs2, <conc>(Rs1, Rs2, Rs3), <conc>(Rs1, Rs2))
+    end
+
+strategies // variables
+
+  forward-prop-assign(transform, before, recur, after | Rs) =
+    |[ <id> = <recur> ]|
+    ; (transform
+        <+ before
+           ; try( ?|[ x = e ]|; undefine-dynamic-rules(|Rs,x) )
+	   ; after
+      )
+
+  forward-prop-assign(transform, before, recur, after | Rs) =
+  {| nargout : 
+      ?|[ [ lvs* ] = e ]|
+    ; where( <length>lvs* => l  ; rules( nargout : _ -> l ))
+    ; |[ [ <*id> ] = <recur> ]|
+    ; (transform
+        <+ before
+           ; where( <map({x: try(?|[ x ]| ; undefine-dynamic-rules(|Rs,x) ) })>lvs*)
+	   ; after
+      )
+  |}
+
+strategies // control-flow
+
+  forward-prop-if(transform, before, recur, after | Rs1, Rs2) =
+    |[ if <recur> then <id> else <id> end ]|
+    ; (transform
+       <+ before
+          ; log-dynrules(|"if","before-branches")
+	  ; (|[ if <id> then <recur> else <id> end ]| ; log-dynrules(|"if","after-branch") 
+                /~Rs1\~Rs2/  |[ if <id> then <id> else <recur> end ]| ; log-dynrules(|"if","after-branch")) 
+          ; log-dynrules(|"if","after-branches")
+          ; after)
+
+  forward-prop-while(transform, before, recur, after | Rs1, Rs2) =
+    |[ while <id> do <id> end ]|
+    ; (transform
+       <+ before
+          ; log-dynrules(|"while","before-branches")
+	  ; /~Rs1\~Rs2/* (|[ while <recur> do <recur> end ]| ; log-dynrules(|"while","after-branch")) 
+	  ; log-dynrules(|"while","after-branches")
+          ; after)
+ 
+  forward-prop-for(transform, before, recur, after | Rs1,Rs2,Rs) =
+      |[ for <id:id> = <recur> do <id> end ]|
+    ; (transform
+       <+ {| ~Rs1: 
+              before 
+	     ; log-dynrules(|"for","before-branches")
+	     ; try( ?|[ for x = e do e2  end ]|;  undefine-dynamic-rules(|<conc>(Rs1,Rs2),x) )
+	     ; (/~Rs1\~Rs2/* |[ for <id:id> = <id> do <recur> end ]| ; log-dynrules(|"for","after-branch") )
+	     ; log-dynrules(|"for","after-branches")
+	     ; after 
+          |}
+      )
+
+ /* Top program level */
+ forward-prop-prog(transform, before, recur, after | RsSc) =
+    Prog(list(id), id)
+  ; (transform <+ 
+	dr-ignore-rules-state(
+          where(get-var-names; map({x:?x; new-dynamic-rules(|RsSc, x,x) }))
+        ; Prog(list(recur), recur)
+        | RsSc)
+    )
+
+
+ forward-prop-funcdec (transform, before, recur, after | RsSc) = 
+    Function(list(id),id,list(id),id) 
+  ; (transform <+ 
+	dr-ignore-rules-state(
+          where(get-var-names; map({x:?x; new-dynamic-rules(|RsSc, x,x) }))
+        ; fp-function(transform, before, recur, after)
+        | RsSc)
+    )
+
+  get-var-names = 
+    collect(\ |[ x ]| -> x \)
+
+
+ fp-function(transform, before, recur, after) = 
+    Function(list(id),id,list(id),id)
+  ; Function(list(id),id,list(id),recur)
+ 
+
+
+ forward-prop-call (transform, before, recur, after | Rs) =
+   Call(id,list(try(recur)))
+  ; (transform 
+	<+ before
+	   ; ?|[ f(a*) ]|
+	   ; after
+     ) 
+
+/**
+ * Dynamic rules helper strategies
+ */
+strategies
+  dynrule-options =
+    ArgOption(
+      "--dyn-rules"
+    , where(<set-config>("--dyn-rules",<get-list-from-option>))
+    , !""
+    )
+  + ArgOption(
+      "--dyn-rules-places"
+    , where(<set-config>("--dyn-rules-places",<get-list-from-option>))
+    , !""
+    )
+  + ArgOption(
+      "--dyn-rules-constructs"
+    , where(<set-config>("--dyn-rules-constructs",<get-list-from-option>))
+    , !""
+    )
+
+  log-dynrules(|construct,place) =
+    if-verbose(
+      where(
+        try(
+          where(
+  	  <get-config>"--dyn-rules-constructs" ; fetch-elem(?construct)
+  	; <get-config>"--dyn-rules-places" ; fetch-elem(?place)
+          )
+        ; <get-config>"--dyn-rules" => [_|_]
+        ; where( say(!"--------------------------------------------------------------------") )
+        ; where(<printnl>(stderr, [ "Showing rulesets at place '",construct,"/",place,"'" ]))
+        ; map(debug-rule-set(|<id>,"--------------------------------------------------------------------"))
+        )
+      )
+    | 1
+    )
+
+// temp copy and adaptation from dynamic-rules-refactored
+strategies
+  debug-rule-set(|name, msg) =
+    where(
+        (!msg => "" <+ say(!msg))
+      ; <debug(!"Ruleset for: ")> name
+      ; print-rule-set(|name)
+    )
+
+  print-rule-set(|name) =
+    where(
+      dr-get-rule-set(|name)
+      ; print-rule-set
+    )
+
+  print-rule-sets(|names) =
+    where(
+      <map(debug; print-rule-set(|<id>))> names
+    )
+
+  print-rule-set =
+    where(map(print-scope))
+
+  print-scope =
+    ?RuleScope(labelset, tbl)
+  ; where(
+      <hashtable-keys> tbl
+	  ; map(
+	      if not(DR_UNDEFINE(id)) then
+                where(<print>(stderr, ["  ", <rm-annotations>, " -> " ]))
+              ; where(
+	          \ key -> <hashtable-get(|key)> tbl \
+                ; map(<print>(stderr, [" ", <Snd>]))
+                ; <print>(stderr,["\n"])
+                )
+              end
+            )
+    )
+
+  print-scope =
+    ?ChangeSet(labelset, rmset, tbl)
+  ; where(
+      <hashtable-keys> tbl
+    ; map(
+        if not(Snd; DR_UNDEFINE(id)) then
+          where(<print>(stderr, ["  Change .. ", <Snd;rm-annotations>, " -> "]))
+        ; where(
+            \ key -> <hashtable-get(|key)> tbl \
+          ; map(<print>(stderr, ["    ", <Snd>]))
+          ; <print>(stderr,["\n"])
+          )
+	end
+      )
+    )
+
+  get-list-from-option =
+    <string-tokenize>([':'],<id>)
+
+  get-nargout = nargout <+ !1 

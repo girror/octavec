@@ -1,0 +1,21 @@
+# PROGRAMS using XTC 
+
+LDADD += -lstratego-xtc ${STRATEGO_XTC_LIBS} -lstratego-runtime ${SSL_LIBS} 
+
+#-loctave -loctinterp -lcruft  -L${OCTAVE}/lib/$(OCTAVE_SUBDIR) 
+
+oparser		= $(PARSER)/bin/octave
+disambiguate	= $(OCTAVE_FRONT)/bin/disambiguate-octave
+octavetc	= $(OCTAVE_FRONT)/bin/octavec
+
+
+# Parsing and Pretty printing ############################### 
+
+%.ast : %.tbm
+	$(oparser) -c -o $@ $<
+ 
+%.txt : %.ast
+	$(disambiguate) -i $< -o $@
+
+%.tyd : %.ast
+	$(octavetc) -i $< -o $@

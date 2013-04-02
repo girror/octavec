@@ -1,0 +1,76 @@
+module TC-FieldVar
+overlays
+  CONSTR = "RECORD"
+
+rules 
+
+  TcFieldVar:
+  fv@FieldVar(x,f) -> FieldVar(x{record}, f){t}
+  where <get-annos;GetTypeShape> x => record 
+ 	; <get-record-field-type> (<id> , fv)  //[f]) 
+	; if ?() then
+	    !UNIVERSAL
+	  end => t
+
+
+
+strategies  
+
+// To parameterize Record-Lib
+
+  /**
+   * Adds an element or retrieves it from the record   
+   */
+  get-add-to-record(|type, fv) =
+     (tc-global <+ tc-var <+ ![])
+   ; try(extract-typeshape)
+   ; add-to-record-structure(|type, fv)
+
+
+
+  add-to-record-structure(|rhs, fv) =
+   (   ?RECORD(rs)
+      ; <not(?[])>rs
+      ;<insert-type-in-record(|rhs)>(fv, RECORD(rs))
+
+    <+ (?RECORD([]) <+ id)
+    //  ; debug(!"In empty rec/ list or ?? ")
+      ;<create-record> (fv, rhs)
+    //  ; debug(!"In empty rec/ list or ?? /OUT ")
+   )
+
+
+  get-record-field-type =
+    get-rose-element(|CONSTR)
+
+  create-record =
+    create-record(|CONSTR)
+
+
+ insert-type-in-record(|type) =
+    (try(get-path) ,id);
+    insert-elem-in-record(avoid-terms|CONSTR, type)
+
+ avoid-terms =
+     not(?RECORD(_))
+
+ create-record = 
+   create-record(|"RECORD") 
+
+ replace-type-in-record(|type) =
+   replace-in-rose-tree(|type)
+
+
+   delete-in-record =
+    (delete-in-rose-tree(|CONSTR) 
+     <+  remove-father-if-empty 
+     //<+  undefine-global-record  UPDATE THIS ACCORDINGLY!!!!
+    )  
+
+ remove-father-if-empty =
+ { path :
+    ?(path,record)
+  ; <get-record-field-type> (path,record)
+  ; (?RECORD([])<+ avoid-terms)
+  ; <delete-in-rose-tree(|CONSTR)> (path, record)
+ }

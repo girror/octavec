@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.2//EN" "http://www.oasis-open.org/docbook/xml/4.2/docbookx.dtd">
+
+<book>
+  <title>Octave Compiler manual</title>
+
+  <bookinfo>
+    <author>
+      <firstname>Rob</firstname>
+      <surname>Vermaas</surname>
+    </author>
+    <copyright>
+      <year>2004</year>
+      <holder>Rob Vermaas</holder>
+    </copyright>
+  </bookinfo>
+
+  <appendix>
+    <title>Command Reference</title>
+
+    <include href="octavec.xml" xmlns="http://www.w3.org/2001/XInclude"/>
+  </appendix>
+</book>

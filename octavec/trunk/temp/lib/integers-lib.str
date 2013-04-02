@@ -1,0 +1,50 @@
+module integers-lib
+imports liblib
+
+
+rules
+/*
+  UptoInit          : i -> (i, [])
+  UptoExit(|last)   : (i, xs) -> xs where <lt> (i, last)
+  UptoStep(|step)   : (i, xs) -> (<subt> (i, step), [i| xs])
+*/
+  DowntoInit        : i -> (i, [])
+  DowntoExit(|l)    : (i, xs) -> xs where <gt> (i, l)
+  DowntoStep(|step) : (i, xs) -> (<add> (i, step), [i| xs])
+
+strategies
+
+  upto-step(|step,last) = 
+   UptoInit;  rec x(UptoExit(|last) <+ UptoStep(|step); x)
+
+ 
+  downto-step(|step,last) = 
+   DowntoInit; rec x(DowntoExit(|last) <+ DowntoStep(|step); x)
+
+
+
+  prod = list-accum((try(?Int(<id>)),try(?Int(<id>))) ; mulS)
+
+
+
+  /** 
+   * Get element at index x
+   * @type Int *  List(a) -> a
+   */
+  get-elem-at-index1 =
+    GIND0 ; rec x(GIND1 <+ GIND2 ;x)
+
+      GIND0  : (x, ys) -> (1, x, ys)
+      GIND1  : (n, n, [x | xs]) -> x
+      GIND2  : (n, y, [x | xs]) -> (<add> (n, 1), y, xs)
+
+  /** 
+   * Set element at index x
+   * @type Int * a *  List(a) -> List(a)
+   */
+  set-elem-at-index1 =
+    SIND0; rec x(SIND1 <+ SIND2(x))
+
+      SIND0    : (i, x, ys) -> (1, i, x, ys)
+      SIND1    : (i, i, x, [y | ys]) -> [x | ys]
+      SIND2(r) : (n, i, x, [y | ys]) -> [y | <r>(<add> (n, 1), i, x, ys)]

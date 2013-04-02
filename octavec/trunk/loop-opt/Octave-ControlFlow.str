@@ -1,0 +1,93 @@
+module Octave-ControlFlow
+strategies
+
+   octave-flow(s) =
+   ( 
+       |[ <id>[<*s>] = <s> ]|
+    <+ |[ <id>{<*s>} = <s> ]| 
+    <+ |[ <id> = <s> ]|
+    <+ |[ [<multi:id>] = <s> ]|
+    <+ |[ if <s> then <id> end ]|
+    <+ |[ if <s> then <id> else <id> end]|
+    <+ |[ for <id:id> = <s>  do <id> end ]|
+    <+ |[ while <id> do <id> end ]|
+    <+ |[ do <id> until <id> end ]| 
+    <+ |[ <id:id>(<*s>) ]|
+    <+ Print(id,id)
+   )
+ 
+  stop-constructors(s) =
+       |[ <id>[<*s>] = <id> ]|     
+    <+ |[ <id>{<*s>} = <id> ]|
+    <+ |[ <id> = <id> ]|
+    <+ |[ [<multi:id>] = <id> ]|     
+    <+ |[ <id:id>(<*s>) ]|
+    <+ Print(id,id)
+ 
+
+  ifthen-block2(s)  =
+    |[ if <id> then <id> end ]|
+    ; |[ if <id> then <s> end]| /Value,GlobalVal\ id
+
+  if-block2(s)  =
+    |[ if <id> then <id> else <id> end ]|
+    ;|[ if <id> then <s> else <id> end]| /Value,GlobalVal\ |[ if <id> then <id> else <s> end ]|
+
+  while-block2(s)  =
+    |[ while <id> do <id> end ]|
+    ;( /Value,GlobalVal\* |[ while <id> do <s> end ]|)
+    ; |[ while <s> do <id> end ]|
+
+  for-block2(s) =
+    |[ for <id:id> = <id>  do <id> end ]|
+    ; /Value,GlobalVal\* |[ for <id:id> = <id> do <s> end ]|
+
+
+// ----PropConst
+
+  ifthen-block(s)  =
+    |[ if <id> then <id> end ]|
+    ; |[ if <id> then <s> end]| /PropConst\ id
+
+  if-block(s)  =
+    |[ if <id> then <id> else <id> end ]|
+    ; |[ if <id> then <s> else <id> end]| /PropConst\ |[ if <id> then <id> else <s> end ]|
+
+  while-block(s)  =
+     |[ while <id> do <id> end ]|
+    ; /PropConst\* |[ while <id> do <s> end ]|
+    ; |[ while <s> do <id> end ]|
+
+
+  dountil-block(s)  =
+    |[ do <id> until <id> end ]|
+    ; /PropConst\* |[ do <s> until <s> end ]|
+
+  for-block(s) =
+    |[ for <id:id> = <id>  do <id> end ]|
+    ; /PropConst\* |[ for <id:id> = <id> do <s> end ]|
+
+ 
+
+  fork-rule(s1, s2|rule-label) = 
+    s1 /rule-label\ s2
+
+  fix-rule(s|rule-label) = 
+    /rule-label\* s
+
+
+
+//----------   BACK --------------
+
+
+ octave-flow-backward(s) =
+    ( Prog(s, id)
+    <+ |[ if <id> then <id> end ]| 
+    <+ |[ if <id> then <id> else <id> end ]|
+    <+ |[ for <id:id> = <id> do <id> end ]|
+    <+ |[ do <id> until <id> end ]|
+    <+ |[ while <id> do <id> end ]|
+    <+ Stats(reverse-filter(s; not(?|[ { } ]| )))
+    <+ |[ unwind_protect <id> unwind_protect_cleanup <s> end  ]|
+    <+ Function(id,id,id,id)
+    ) <+ all(s)

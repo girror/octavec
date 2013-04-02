@@ -1,0 +1,181 @@
+module Octave-TC
+imports TC-Expressions
+        TC-MExpansion
+        TC-Matrix
+        TC-Conversions
+        TC-DefFunctionShape
+        TC-CommonLib
+        TC-FieldVar
+        TC-Assignments
+        TC-Functions
+	TC-EvalFunction
+        TC-Statements
+        TC-Subscript
+
+        TC-Cell
+        TC-Calls
+	TC-PartialTypes
+	TC-TypeMatching
+
+	Explain-Errors 
+	Record-Lib 	
+//	ElimRules Eval-Functions  
+	Octave-TCSystem
+	Octave Octave-Joint Octave-TypeIncludes  Octave-Shapes 
+	Octave-Exp-Lib
+        liblib stratego-xt-xtc-tools local-lib 
+	octave/xtc
+
+	//color-lib
+//output-control
+ 
+strategies
+    
+  io-Octave-TC = 
+   octave-io-wrap(octave-avoid-functions, octave-type-shape ) 
+
+  octave-avoid-functions =
+   ArgOption("--avoid",
+      where(<set-config>("--avoid",<pack-avoid-functions>)),
+      !"--avoid f:functions Do not specialize functions")
+   + ArgOption("--unroll",id,!"")
+
+
+  octave-type-shape = 
+    Prog(id,id){include-type-rename-info}
+      ; eval-type-shape(fail)
+      ; include-typedfunctions
+
+
+
+  eval-type-shape(include) = 
+        (alternative(eval-type-shape(include)) <+ all(eval-type-shape(include)))
+	; try(  include
+		<+ tcheck-expressions(eval-type-shape(include))
+		<+ tcheck-stats(eval-type-shape(include))
+		//<+ include
+		<+ Explain
+             ) 
+
+
+
+
+
+
+   /**
+    * used to infer types of mutual recursive functions 
+    */
+   eval-type-shape-rec(include) =
+        alternative(eval-type-shape-rec(include) <+ all(eval-type-shape-rec(include)))
+	; try(  include 
+		<+  tcheck-expressions(eval-type-shape-rec(include))
+		<+ tcheck-stats(eval-type-shape-rec(include))
+             )
+ 
+
+   include-type-rename-info =
+     where(
+         try(?[<id>])
+       ; ?(a,b)
+       ; <builtin-definitions> a 
+       ; <provide-type-info> b
+     )
+
+    provide-type-info =
+     map( \g@Func(f,fs,vn,bs,t) -> g
+	  where rules(GetTypeInfo: f ->Func(f,fs,vn,bs,t) )
+	 \
+       )
+
+    builtin-definitions =
+     [declare-constant,declare-vars,declare-libfunctions,declare-mappings]
+
+    declare-constant =
+      Constants(map({x, ts: ?VarTyped(x,ts); <create-type-constant-rule>(Constant(x),ts)}))
+
+    declare-vars =
+      Variables(map({x, ts: ?VarTyped(x,ts); <create-type-rule>(Var(x),ts)}))
+
+
+    create-type-constant-rule =
+    {x,ts: ?(x,ts); rules(TcConst: x -> x{ts})}
+
+    declare-libfunctions = 
+     LibFuncs(map(MakeLibCall<+ MakeLibCallNotStrict))
+
+    declare-mappings =
+     MappingFuncs(map(try(MakeMappingCall)))
+
+
+   /**
+    * Group of functions that can be applied to each element of a matrix
+    */
+    MakeMappingCall=
+    {f,in-args,out-args:
+     ?FunctionSig(f,in-args,out-args)
+     ;rules(
+	MappingCall:+ Call(Var(f),aa) -> ret-types
+        where  <eq>(<length>out-args,<NumArgsOut <+ !1>())
+	     ; <check-strict-arguments-call(fail)>(aa,in-args)
+	     ; <instantiate-shapes <+ !out-args>(aa,in-args,out-args) => ret-types
+      )
+    }
+
+    MakeLibCallUnit =
+     {f,in-args,out-args:
+     ?FunctionSig(f,in-args,[])
+     ; rules(
+	LibCallUnit:+ Call(Var(f),aa) -> []
+      )
+     }
+
+
+    MakeLibCall =  
+    {f,in-args,out-args:
+     ?FunctionSig(f,in-args,out-args)
+     ; where(not(oncetd(?MANY(_) + ?ONE_MANY(_) + ?Var(_) )))
+     ; rules(
+	LibCall:+ Call(Var(f), aa) -> ret-types
+         where   <eq>(<length>out-args, <NumArgsOut <+ !1>())
+	       ; <check-strict-arguments-call(fail)>(aa, in-args)
+	       ; <instantiate-shapes <+ !out-args>(aa,in-args, out-args) => ret-types 
+      )
+    }
+
+    MakeLibCallNotStrict =  
+    {f,in-args,out-args:
+     ?FunctionSig(f,in-args,out-args)
+     ; rules(
+	LibCall:+ Call(Var(f),aa) -> ret-types
+         where    if-verbose1(debug(!"not strict "))
+		;  <eq>(<length>out-args,<NumArgsOut <+ !1>())
+		; <check-arguments-call>(aa,in-args)
+	        ; <(instantiate-shapes <+ !out-args)>(aa, in-args, out-args) => ret-types
+		; if-verbose1(debug(!"not strict out "))
+      )
+    }
+
+
+
+  include-typedfunctions =
+     ?Prog(_,p){a}
+   ; where( <bagof-TypedFunction> () => funcs 
+	    ;<bagof-KeepTypeInfo> ()  => renamings
+        ) 
+   ; !Prog(funcs, p){<update-renamings>(a,renamings)}
+          
+
+  update-renamings =
+   ?((a,b),renamings)
+   ; !(a,renamings)
+
+
+
+  set-library-info =
+    initialize-octave-stuff
+
+  is-library-func =
+    is-mapping-function ; not([]) 
+  + is-builtin-function ; not([])
+
+

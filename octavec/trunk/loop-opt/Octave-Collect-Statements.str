@@ -1,0 +1,38 @@
+module Octave-Collect-Statements
+imports 
+  liblib 
+  liboctavec
+
+strategies
+
+   collect-statements =
+      mapconcat(collect-for <+ collect-stat)
+        
+  collect-for = 
+    ? |[ for x = e do e2 end ]|  
+    ; <? |[ (1:1:e1) ]|> e
+    ; <try(?|[ i ]|; <string-to-int>i)> e1 => j
+    ; rules(  
+        IV         :+ _ -> x
+	IsIV       :  x
+        UpperBound :  x -> j 
+      )
+    ; <standardize-input> e2
+    ; collect-statements
+    
+  collect-stat:
+    stat -> [(stat, uid)]
+    where new => uid
+        ; if <?|[ lv = e ]| <+ ?Silent(|[ lv = e ]|)> stat
+	  then rules( IsAssign : lv )
+	  end 
+        ; bigbagof-IV ; reverse 
+        ; map(\ a -> (a,<UpperBound>a )\) => ivs
+        ; rules( IdToStat : uid -> stat )
+        ; rules( IdToIV : uid -> ivs ) 
+        
+  RemoveSilent =
+    ?Silent(<id>)        
+
+
+  

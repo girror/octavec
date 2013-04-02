@@ -1,0 +1,80 @@
+module TC-Matrix
+rules 
+
+	  
+  TcRow: 
+  xs -> xs{|[ ts ]|}
+  where   <getListType(get-type|NIL)> xs => widetype 
+	; <length;int-to-string> xs => cols
+	; !MATRIX(widetype,[Int("1"),Int(cols)]) => ts
+
+//  TcExp:
+//  Matrix([]) ->Matrix([]){Cookie}
+  TcExp:
+  Matrix([]) ->Matrix([]){MATRIX(FLOAT,[])}
+
+  //check if #of rows is equal!!!
+  TcMatrix: 
+   Matrix(ys) -> Matrix(rows){ |[ matrix(t,dim(sh*)) ]| }
+   where   <map(TcRow)> ys => xs
+	; <getMatrixType(|NIL)> xs => t
+	; <map(rm-annotations)> ys => rows
+	; <Hd; length; int-to-string> xs => ncols
+	; <length; int-to-string> xs  => nrows
+	; ![Int(nrows),Int(ncols)] => sh*
+
+
+  TcMatrix: 
+   Matrix(ys) -> Matrix(rows){ |[ matrix(char,dim(sh*)) ]| }
+   where <map(map(?e{MATRIX(CHAR,_)}))> ys => rows
+        ; <rm-annotations> rows => rows'
+	; <Hd;Hd;?String(<id>); length; int-to-string> rows' => ncols
+	; <length; int-to-string> rows'  => nrows
+	; ![Int(nrows),Int(ncols)] => sh*
+
+  TcMExp:
+   |[ e:: ts ro e1 :: ts1 ]| ->
+      |[ (e:: ts ro e1 :: ts1):: matrix(bool,dim(sh*)) ]|
+   where <is-relop>ro
+       ; <matrix-matrix> (ts, ts1) => ts2
+       ; GetShape =>sh*
+
+  TcMExp:
+   |[ e :: ts bo e1:: ts1 ]| -> |[ (e :: ts bo e1:: ts1):: ts2 ]|
+   where <?|[ - ]| + ?|[ + ]|> bo 
+	; <matrix-matrix> (ts, ts1) => ts2 
+
+  TcMExp:
+   |[ e :: ts * e1:: ts1 ]| -> |[ (e :: ts * e1:: ts1):: matrix(t2,dim(sh*))]|
+   where  if <GetTypeShape>ts => MATRIX(t,[r,x]) ; <GetTypeShape>ts1 => MATRIX(t1,[x,c]) then
+            <get-wide-scalar>(t,t1) => t2
+          ; ![r,c] => sh*
+          else
+            say(!"Dimension mismatch for multiplying matrices.")
+          ; fail
+          end
+
+  TcMExp:
+   |[ e :: ts / e1:: ts1 ]| -> 
+	|[ (e :: ts / e1:: ts1):: matrix(t2,dim(sh*)) ]|
+   where  <GetTypeShape>ts => MATRIX(t,[r,c])
+	; <GetTypeShape>ts1 => MATRIX(t1,[r,c])
+	; <get-wide-scalar>(t,t1)
+	; try(?INT;!FLOAT) => t2
+	; ![r,r] => sh*
+
+
+  TcMExp:
+   |[ (e :: ts) uo ]| -> |[ ( e :: ts ) uo ::ts1 ]| 
+   where <?|[ ' ]| + ?|[ .' ]|>uo
+	; <GetTypeShape>ts => MATRIX(t,[r,c])
+	; !MATRIX(t,[c,r]) => ts1
+
+
+  matrix-matrix =
+   ?(ts, ts1)
+  ; <GetTypeShape>ts =>|[ matrix(t,dim(sh*)) ]|
+  ; <GetTypeShape>ts1 => |[ matrix(t1,dim(sh*)) ]|
+  ; <get-wide-scalar>(t,t1) => t2
+  ; !|[ matrix(t2,dim(sh*)) ]|
+

@@ -1,0 +1,36 @@
+module Octave-ZIV
+imports 
+  liblib 
+  liboctavec
+signature
+  constructors
+    ZIV    : Constraint  
+        
+strategies    
+
+  classify-ziv =
+      collect-all(\ Var(a) -> a \) => var-list
+    ; ?[]
+    ; !ZIV
+
+  ZIV-test =
+    ? (subs1, subs2)
+    ; <get-ziv-bounds> subs1 => (i1,i2)
+    ; <get-ziv-bounds> subs2 => (j1,j2)
+    ; if <leq-leq>(i1,j1,i2) 
+      <+ <leq-leq>(i1,j2,i2)
+      <+ <leq-leq>(j1,i1,j2) 
+      <+ <leq-leq>(j1,i2,j2)
+      then !DEPENDENCE 
+      else !NO-DEP 
+      end
+     
+  get-ziv-bounds :
+    |[ (i:j:k) ]| -> (l,u)
+    where <try(string-to-int)>i => l
+        ; <try(string-to-int)>k => u
+ 
+  get-ziv-bounds :
+    |[ i ]| -> (l,l)
+    where <string-to-int> i => l    
+

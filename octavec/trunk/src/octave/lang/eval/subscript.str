@@ -1,0 +1,73 @@
+module octave/lang/eval/subscript 
+ 
+rules
+  // One index only for vectors or colon
+
+ EvalSubscr:
+  Subscript(x,[Colon()]) -> x 
+  where <is-scalar> x
+
+ EvalSubscr:
+  Subscript(x,[Int("1")]) -> x 
+  where <is-scalar> x
+
+
+ EvalSubscr:
+  Subscript(Matrix(ms),[Colon()]) -> Matrix(<colon> ms)
+
+
+ EvalSubscr:
+  Subscript(Matrix([ms]),[Int(x)]) -> <get-col> (x,ms)
+
+
+// EvalSubscr:
+//  Subscript(Matrix([ms]),[Range(Int(i),Int(s),Int(l))]) -> Matrix([ms'])
+//  where <range-integers>(i,s,l) ;
+//	map( \ indx -> <get-col> (indx,ms) \ ) => ms'
+
+
+
+
+strategies
+
+ colon = 
+   matrix-transpose 
+ ; flatten-list
+ ; ?m
+ ; <matrix-transpose>[m]
+
+
+rules
+
+  // TWO index for matrices
+
+ EvalSubscr:
+ Subscript(x,[Colon(),Colon()]) -> x
+ where <is-scalar + ?Matrix(_) + ?String(_)>x
+
+ EvalSubscr:
+ Subscript(v, [Int(x),Colon()]) -> v
+ where <is-scalar>v
+
+ EvalSubscr:
+ Subscript(v, [Int("1"),Int("1")]) -> v
+ where <is-scalar>v
+
+
+ EvalSubscr:
+ Subscript(Matrix(mss),[Int(x),Colon()]) -> 
+        Matrix([<get-row>(<string-to-int>x,mss)])
+
+ EvalSubscr:
+ Subscript(Matrix(mss),[Colon(),Int(x)]) ->
+	 Matrix(<get-cols> (x,mss))
+
+ EvalSubscr:
+ Subscript(Matrix(ms),[Int(x),Int(y)]) -> z
+ where <get-row> (<string-to-int>x,ms) => mx;
+       <get-col> (<string-to-int>y,mx) => z
+
+ EvalSubscr:
+ Subscript(String(ss),[Colon()]) -> Matrix(strs)
+   where <map(!String([<id>]))> ss => ss'
+    ; <matrix-transpose>[ss'] => strs

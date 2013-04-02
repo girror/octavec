@@ -1,0 +1,28 @@
+module Octave-FunctionsInUse
+imports liblib Octave Octave-Joint Octave-Shapes Octave-TypeIncludes
+
+strategies
+ 
+    io-Octave-FunctionsInUse =
+     io-wrap(octave-func-in-use)
+
+     octave-func-in-use =
+           ?prog{_}
+	; <collect(GetFuncCall)> prog => calls
+	; <collect(FuncDef)> prog => fundecs
+	; <not-def-functions>(fundecs,calls)
+	 
+
+
+    not-def-functions =
+	 ?(defs,calls)
+        ; <diff>(calls,<isect> (defs,calls)) => funcs-not-def
+
+
+rules
+
+	
+
+ GetFuncCall: Call(Var(f),_) -> f
+ 
+ FuncDef: Function(_,f,_,_) -> f

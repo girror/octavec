@@ -1,0 +1,125 @@
+module Octave2INSN
+imports lib  Octave-Constructs dynamic-rules INSN  Insn-Types Frames 
+	Translate-Statements Translate-Expressions Translate-Operators
+
+//Octave-Shapes
+
+strategies
+    Octave2INSN = 
+     iowrap(translate)
+
+
+  translate =
+    ; Prog(id, !FunctionDec([], "octave_main", [], <id>))
+    ; ?Prog(fs, p)
+    ; <conc> (fs,[p])
+    ; {| TrVar:
+          map(try(TransProc + TransFunction))
+      |}
+    ; !SEQS(<id>)
+
+  tr-fundec =
+    {| TrVar, Frames, Offset :
+       //DeclareFrame; 
+	try(TransProc + TransFunction)
+     // <+ debug(!"not a function declaration: "); giving-up
+    |} 
+
+
+
+  tr-stm = 
+     (TrStmt1 <+ TrStmt); try(tr-stm) 
+    <+ TrCond; tr-stm
+    <+ tr-stm(tr-stm, tr-exp)
+    //<+ debug(!"not a statement: "); giving-up 
+ 
+
+  tr-stm(s, e) =
+    STORE(try(e), try(e)) + LOAD(e,e) + CONST(try(e),id) +
+    DATA(try(TransOp),e,e)  + 
+    BRANCH(e,id,e,id) + SEQ(s,s) +
+    SEQS(list(s)) + LABEL(id) + LABELREF(id,id) + 
+    NOTE_LOC_BIRTH(try(e)) + 
+    NOTE_LOC_DEATH (try(e)) +  
+    NOTE_LOOP_START (id) +  
+    NOTE_LOOP_FINISH(id) + 
+    IN_ARG(try(e),id) +
+    IN_RET(id, try(e)) +
+    OUT_ARG(id,try(e)) +
+    OUT_RET(try(e),id) +
+    ALLOC_FRAME(id,id) +
+    FREE_FRAME(id,id)
+
+
+  tr-exp =
+    TrExp; tr-exp 
+    <+ TrVar
+    <+ tr-exp(tr-stm, tr-exp)
+    //<+ tr-dec(tr-exp)
+    //<+ debug(!"not an expression: "); giving-up
+
+
+
+  tr-exp(s, e) =
+    LOC(e, id) + 
+     Call(id, id); !EX(<id>); s // + ESEQ(list(s),e) 
+    
+
+
+rules
+
+
+
+  TrCond:
+  Cx(RelOp(o, x, y), loc_t, loc_f) ->
+  SEQS([ DATA(o,[x],[y]),
+	BRANCH(EQ, x, loc_t, None)   // is x == 0? 
+  ])
+
+ 
+ 
+
+  MoveStackPointer: 
+  positions -> 
+  SEQS([NOTE_LOC_BIRTH(new-loc),
+	CONST(new-loc, stack-space),
+	DATA(ADD,[SPointer], [new-loc]),
+	NOTE_LOC_DEATH(new-loc)
+      ])
+  where <mul> (positions,WordSize) => stack-space;
+	!LOC(<new>, WORD) => new-loc
+
+
+  ArgToStack :
+    (i, Var(x){M(t,d)}) -> OUT_ARG(i, e)
+  where <BindArgToLoc>  Var(x){M(t,d)} => e
+
+
+  ArgToStack :
+    (i, Int(x){M(t,d)}) -> 
+    SEQS([ NOTE_LOC_BIRTH(loc),
+	   CONST(loc, x),
+	   OUT_ARG(i, loc),
+ 	   NOTE_LOC_DEATH(loc)
+         ])
+  where !LOC(<new>,t) => loc
+
+
+  BindArgToLoc:
+   Var(v){M(t,d)} ->  LOC(v, t)
+   where rules(TrVar: Var(v){sh} -> LOC(v, t))
+
+
+  CopyRetValsToStack:
+  locs -> 
+  SEQS([SEQS(ret-vals),
+        stack-code
+       ])
+  where <nzip0(\ (i, loc) ->  IN_RET(i,loc) \ )> locs => ret-vals;
+	<length> locs => out_ret_vals;
+	<MoveStackPointer> out_ret_vals => stack-code
+
+
+  
+    
+

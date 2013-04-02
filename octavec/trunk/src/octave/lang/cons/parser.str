@@ -1,0 +1,30 @@
+module octave/lang/cons/parser
+imports octave/lang/cons/common
+signature
+  constructors
+    DLDFunction      : ParserOutput
+    BuiltinFunction  : ParserOutput
+    FunctionNotFound : ParserOutput
+
+    NaN : Term
+    Inf : Term 
+    VarArgs : Term
+
+    Print : Term * Term -> Term
+
+    Prog : Term * Term -> Term
+    GlobalInit : Term * Term -> Term
+    Global : Term -> Term
+    StaticInit : Term * Term -> Term
+    Static : Term -> Term   
+    Char : Term -> Term
+    Silent : Term -> Term
+    Constant : Term -> Term
+    Complex : Term -> Term
+    If : Term * Term -> Term
+    Else : Term -> Term
+    Ifs : Term -> Term
+    Number : Term -> Term
+    Command : Term * Term -> Term
+
+    Func : Term * Term * Term * Term * Term -> Term

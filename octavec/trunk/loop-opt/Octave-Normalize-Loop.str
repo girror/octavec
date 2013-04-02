@@ -1,0 +1,32 @@
+/**
+ * Normalizes For loops to ensure that lower bound and stide are 1.
+ */
+module Octave-Normalize-Loop
+imports 
+  liblib 
+  liboctavec
+strategies
+  io-Octave-Normalize-Loop = io-wrap(normalize-loops)
+  
+  normalize-loops = 
+    rec rec(
+      {| rename-iv, rewrite-iv-assign : 
+         normalize-for-loop(rec) <+ rewrite-iv-assign <+ rename-iv <+ all(rec) 
+      |})
+
+rules   
+  normalize-for-loop(rec) :
+    |[ for x = (e1 : e2 : e3) do e4 end ]| 
+      -> |[ { for y = (1 : 1 :  (((e3 - e1) + e2) / e2) ) do
+                 e5
+               end ;
+               x = (((e2 *  y) - e2) + e1) 
+            }]|
+    where
+      ( <not(?|[ 1 ]|)>e1 + <not(?|[ 1 ]|)>e2 )
+    ; <newname>"iv" => y
+    ; rules( 
+        rename-iv         : |[ x ]|     -> |[ (((e2 *  y) - e2) + e1) ]|
+	rewrite-iv-assign : |[ x = e ]| -> |[ y = (((e + e2) - e1) / e2)  ]|
+      )
+    ; <rec>e4 => e5

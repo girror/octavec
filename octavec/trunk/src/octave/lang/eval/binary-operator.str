@@ -1,0 +1,242 @@
+module octave/lang/eval/binary-operator
+
+rules
+
+
+   EvalString:
+    Matrix([[String(z)]]) -> String(z)
+
+   EvalString:
+    Matrix([xs]) -> String(ys)
+    where <eval-strings> xs => ys
+
+   EvalBinOp :
+   |[ i + j ]| -> |[ k ]|where <addS>(i,j) => k
+
+
+   EvalBinOp :
+   |[ e + 0 ]| -> |[ e ]|
+
+   EvalBinOp :
+   |[ 0 + e ]| -> |[ e ]|
+
+   EvalBinOp :
+   |[ e * 1 ]| -> |[ e ]| 
+
+   EvalBinOp :
+   |[ 1 * e ]| -> |[ e ]| 
+
+   EvalBinOp :
+   |[ 0 * e ]| -> |[ 0 ]|
+
+   EvalBinOp :
+   |[ e * 0 ]| -> |[ 0 ]|
+
+   EvalBinOp :
+   |[ i * j ]| -> |[ k ]| where <mulS>(i,j) => k
+
+   EvalBinOp :
+   |[ i - j ]| -> |[ k ]| 
+   where <not(?"0")>i 
+	; <gtS>(i,j)
+	; <subtS>(i,j) => k
+
+   EvalBinOp :
+   |[ i - j ]| -> |[ 0 - k ]| 
+   where <not(?"0")>i 
+	; <ltS>(i,j)
+	; <subtS>(j,i) => k
+
+   EvalBinOp :
+   |[ e - e ]| -> |[ 0 ]|
+
+   EvalBinOp :
+   |[ e - 0 ]| -> |[ e ]|
+
+   EvalBinOp :
+   |[ i ^ j ]| -> |[ k ]| where <power(|i)> j => k
+
+   EvalBinOp :
+   |[ k ^ 0 ]| -> |[ 1 ]|
+
+   EvalBinOp :
+   |[ k ^ 1 ]| -> |[ k ]| 
+
+   EvalBinOp :
+   |[ e / 1 ]| -> |[ e ]|
+
+   EvalBinOp :
+   |[ k / k ]| -> |[ 1 ]| 
+   where <not(?"0")> k
+
+
+   EvalBinOp :
+   |[ e / e ]| -> NaN()
+   where <?Inf()> e
+
+
+
+   EvalRelOp : 
+   |[ i == j ]| ->  |[ e ]|
+   where <eval-relop(eq)>(i,j) => e
+
+
+   EvalRelOp : 
+   |[ e == e ]| ->  |[ true ]|
+   where <is-scalar> |[ e ]|
+
+
+   EvalRelOp : 
+   |[ s == s ]| ->  |[ true ]|
+
+   EvalRelOp : 
+   |[ s == s1 ]| ->  |[ false ]|
+   where not(<eq>(s,s1))
+
+   EvalRelOp : 
+   |[ s != s ]| ->  |[ false ]|
+
+   EvalRelOp : 
+   |[ s != s1 ]| ->  |[ true ]|
+   where not(<eq>(s,s1))
+
+   EvalRelOp : 
+    BinOp(Inf(),"==",Inf()) -> |[ true ]|
+
+   EvalRelOp : 
+    BinOp(Inf(),"==", e) -> |[ false ]|
+    where <not(?Inf())>e
+
+   EvalRelOp : 
+    BinOp(e,"==",Inf()) ->  |[ false ]|
+    where <not(?Inf())>e
+
+   EvalRelOp :  
+   |[ i != j ]| ->  |[ e ]|
+   where <eval-relop(not(eq))>(i,j) => e
+
+   EvalRelOp :  
+   |[ e != e ]| ->  |[ false ]|
+
+   EvalRelOp :
+   |[ i > j ]| ->  |[ e ]|
+   where <eval-relop(gtS)>(i,j) => e
+
+   EvalRelOp :
+   |[ i < j ]| ->  |[ e ]|
+   where <eval-relop(ltS)>(i,j) => e
+
+   EvalRelOp : 
+   |[ i >= j ]| ->  |[ e ]|
+   where <eval-relop(geqS)>(i,j) => e
+
+   EvalRelOp :
+   |[ i <= j ]| ->  |[ e ]|
+   where <eval-relop(leqS)>(i,j) => e
+
+   EvalRelOp :
+   |[ true ro false ]| -> |[ false ]| 
+   where <?|[ | ]| + ?|[ || ]|>ro
+
+   EvalRelOp :
+   |[ false ro true ]| -> |[ false ]| 
+   where <?|[ | ]| + ?|[ || ]|>ro
+
+   EvalRelOp :
+   |[ false ro true ]| -> |[ false ]| 
+   where <?|[ & ]| + ?|[ && ]|>ro
+
+   EvalRelOp :
+   |[ false ro false ]| -> |[ false ]| 
+   where <?|[ & ]| + ?|[ && ]| + ?|[ | ]| + ?|[ || ]|>ro
+
+   EvalRelOp :
+   |[ true ro true ]| -> |[ true ]| 
+   where <?|[ & ]| + ?|[ && ]| + ?|[ | ]| + ?|[ || ]|> ro
+
+   EvalRelOp :
+   |[ true | false ]| -> |[ true ]| 
+
+   EvalRelOp :
+   |[ false | true ]| -> |[ true ]| 
+
+
+
+   EvalRelOp :
+   |[ e1 && e ]| -> |[ e ]| 
+   where <is-true> e1
+
+   EvalRelOp :
+   |[ e && e1 ]| -> |[ e ]| 
+   where <is-true> e1
+
+   EvalRelOp :
+   |[ e && e1 ]| -> |[ false ]|
+   where <is-false> e1
+
+   EvalRelOp :
+   |[ e1 && e ]| -> |[ false ]|
+   where <is-false> e1
+ 
+   EvalRelOp :
+   |[ e1 || e ]| -> |[ e ]| 
+   where <is-false> e1
+
+   EvalRelOp :
+   |[ e || e1 ]| -> |[ e ]|
+   where <is-false> e1
+
+   EvalRelOp :
+   |[ e1 || e ]| -> |[ true ]| 
+   where <is-true> e1
+
+   EvalRelOp :
+   |[ e || e1 ]| -> |[ true ]| 
+   where <is-true> e1
+
+   EvalUnOp :
+    PostfixExp(Matrix(rows),".'") ->  Matrix(<matrix-transpose>rows)
+
+	
+   EvalUnOp :
+   |[ e.' ]| -> e
+   where <is-scalar-num> e
+
+   EvalUnOp :
+   |[ !e ]| -> |[ false ]|
+   where <is-true> e
+
+   EvalUnOp :
+   |[ !e ]| -> |[ true ]|
+   where <is-false> e
+   
+
+
+
+
+strategies
+
+
+  matrix-size =
+  {xs:?xs
+   ; length => rows  
+   ; <(Hd <+ ![]); length>xs => cols
+   ;!(rows,cols)
+   ; (int-to-string, int-to-string)
+  }
+
+
+  /**  Computes  val to the power 
+   *  of the given argument 
+   *  only for 0 and natural numbers 
+   *  @type: int -> int
+   */ 
+ power(|val) =
+    try(string-to-int)
+  ; where(<try(string-to-int)>val => value; <geq>(value, 0) )
+  ; where(<geq>(<id>,0) ) 
+  ; <subt>(<id>, 1)
+  ; upto
+  ; foldr(!1, ?(_,<!(<id>,value)>); mul)
+  ; int-to-string
+ 

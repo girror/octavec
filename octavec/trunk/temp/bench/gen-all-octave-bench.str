@@ -1,0 +1,35 @@
+module gen-all-octave-bench
+imports liblib
+
+strategies
+
+  pack-the-options =
+    parse-options( verbose-option + pack-options)
+
+  pack-options =
+    ArgOption("--dir", where(<set-config>("--dir", <id>)), !"--dir dir  Include modules from directory dir")
+
+  io-gen-all-octave-bench =
+    pack-the-options
+  ; xtc-temp-files(
+      <get-config>"--dir"
+    ; browse-directory(has-extension(!".m"))
+    ; filter(not(ofe))
+    )
+
+  browse-directory(f) = 
+    ?dir
+  ; readdir
+  ; where(<extend-config>("-I",[dir]))
+  ; filter(not("."+".."))
+  ; filter( <concat-strings>[dir,"/",<id>]; f + (\ s -> <concat-strings>[dir,"/",s] \ ; browse-directory(f)))
+  ; flatten-list
+
+  ofe =
+    ?file
+  ; debug(!" -> parsing file ")
+  ; where( get-filename ; remove-extension => bn )
+  ; <flatten-list>[<get-config;map(!["-I",<id>])>"-I",<pass-verbose>,"-i",file]
+  ; xtc-command(!"octave-bench-file")
+  <+ say(!" -> parsing failed!") ;fail
+

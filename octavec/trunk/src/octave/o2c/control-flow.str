@@ -1,0 +1,169 @@
+module octave/o2c/control-flow
+
+// if
+rules
+
+  TranslateIf(exp) :
+    |[ if e1 then e2 else e3 end ]|  -> stm |[ if(e)  stm1  else stm2  ]|
+    where
+      <octave-exp-to-bool(exp)>e1 => e
+    ; <TranslateStmt(exp)>e2 => stm1
+    ; <TranslateStmt(exp)>e3 => stm2
+
+
+  TranslateIf(exp) :
+    |[ if e1 then e2 end ]| -> stm |[ if(e) stm1 ]|
+    where
+      <octave-exp-to-bool(exp)>e1 => e
+    ; <TranslateStmt(exp)>e2 => stm1
+
+
+// while
+rules
+
+  TranslateWhile(exp) :
+    |[ while e do e1 end ]| 
+      -> stm |[ while(e2) stm1 ]|
+    where 
+      <octave-exp-to-bool(exp)>e => e2
+    ; <TranslateStmt(exp)>e1 => stm1
+
+// for
+rules
+  // For with known range
+  TranslateFor(exp) :
+    |[ for x = e0 do e1 end ]|
+      -> stm 
+         |[ { int y;
+              for( y = 0 ; y < floor((e4 - e2 + e3) / e3 ) ; y ++ ) { 
+                x = e2 + ( y * e3 ) ;
+                stm
+              }
+            }
+         ]|
+      where 
+        <Range(is-simple-constant;exp,is-simple-constant;exp,is-simple-constant;exp)>e0 => Range(e2,e3,e4)
+      ; <TranslateStmt(exp)>e1 => stm
+      ; <newname>"int" => y
+
+  // For with unknown range
+  TranslateFor(exp) :
+    |[ for x = e0 do e1 end ]|
+      -> stm 
+         |[ { int y;
+              Range z = e2 ;
+              for( y = 0 ; y < z.nelem() ; y ++ ) { 
+                x = z.base() + ( y * z.inc() ) ;
+                stm
+              }
+            }
+         ]|
+      where 
+        <is-unknown-range>e0 
+      ; <newname>"int"  => y
+      ; <newname>"range" => z
+      ; <TranslateStmt(exp)>e1 => stm
+      ; <TranslateRange>e0 => e2
+
+  is-unknown-range = is-range ; oncetd(Var(id)) //fail
+
+  // For with simple constant
+  TranslateFor(exp) :
+    |[ for x = e1 do e2 end ]|
+      -> stm 
+         |[ { x = e3 ;
+              stm
+            }
+         ]|
+      where 
+        <is-simple-constant>e1 
+      ; <exp>e1 => e3
+      ; <TranslateStmt(exp)>e2 => stm
+
+
+  // For with unknown matrix
+  TranslateFor(exp) :
+    |[ for x = e1 do e2 end ]|
+      -> stm 
+         |[ { 
+              int y ;
+              for( y=0; y < e3.columns() ; y ++ ) { 
+                x = e3(0,y) ;
+		stm
+              }
+            } 
+         ]|
+      where 
+        <is-row-vector>e1
+      ; <newname>"int" => y
+      ; <exp>e1 => e3
+      ; <TranslateStmt(exp)>e2 => stm
+      
+
+
+  is-row-vector = get-octave-type ; ?MATRIX(_,[Int("1")|_])
+
+  // For with unknown matrix
+  TranslateFor(exp) :
+    |[ for x = e1 do e2 end ]|
+      -> stm 
+         |[ { 
+              int y ;
+              for( y=0; y < e3.columns() ; y ++ ) { 
+                x = octave_value(e3).matrix_value().extract(0,y,e3.rows()-1,y) ;
+                stm
+              } 
+            }
+         ]|
+      where 
+        <not(is-row-vector + is-range + is-simple-constant )>e1
+      ; <newname>"int" => y
+      ; <exp>e1 => e3
+      ; <TranslateStmt(exp)>e2 => stm
+
+  is-range = Range(id,id,id)
+
+  is-simple-constant = 
+    Float(id)
+  + Int(id)
+  + Constant(id)
+
+// continue and break
+rules
+
+  TranslateReturn =
+    if oct-return-args => args then
+      TranslateReturnOct(|args)
+    else
+      TranslateReturnNormal
+    end
+
+  TranslateReturnOct(|args) =
+    ?Return()
+  ; return-var => Var(x)
+  ; <args-to-return(|x)>args
+
+  args-to-return(|x) =
+    map(TranslateExp)
+  ; list-to-ov-list(|x) => stm*
+  ; !stm |[ { stm*
+              return x ;
+            }
+         ]|
+
+  TranslateReturnNormal: 
+    Return() ->  stm |[ return x; ]|
+      where return-var => Var(x)
+
+
+  TranslateReturnNormal: 
+    Return() ->  stm |[ return ; ]|
+      where not(return-var)
+
+  TranslateBreak:
+    Break() -> stm |[ break ; ]|
+
+  TranslateContinue:
+    Continue() -> stm |[ continue ; ]|
+
+

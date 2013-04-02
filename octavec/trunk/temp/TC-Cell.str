@@ -1,0 +1,68 @@
+module TC-Cell
+strategies
+
+
+ TcExp: Cell(es) -> Cell(es){ts} 
+  where <map(map(extract-typeshape))>es
+	; type-cell => ts
+
+ TcExp: 
+  |[lv::ts{a*}]| ->   |[lv::ts{a*}::ts1]| 
+  where <GetTypeShape;?CELL([])>ts
+	;!UNIVERSAL => ts1
+
+ TcExp: 
+  |[lv::ts{1::int}]| ->   |[lv::ts{1::int}::ts1 ]| 
+  where <get-scalar>ts => ts1
+
+
+ TcExp: 
+  |[lv::ts{(:)::ts1}]| ->   |[lv::ts{(:)::ts1}::ts]| 
+  where <GetTypeShape; ?CELL(_)>ts
+
+
+ TcExp: 
+  |[lv::ts{a*}]| ->  |[lv::ts{a*}::ts1]| 
+  where <get-cell-index>(ts,a*) => ts1
+
+
+
+ TcExp:
+  Subscript(lv{ts}, a*) -> Subscript(lv{ts}, a1*) { ts1 }
+  where  <GetTypeShape>ts => CELL(ts*)
+	; <fix-colons>(a*, CELL(ts*)) => a1*
+	; <shape-subscript>(a1*,CELL(ts*)) => ts1
+
+
+
+strategies 
+
+ 
+  get-cell-index = 
+     (GetTypeShape, map(?Int(<id>)); squeeze-cell-index)
+   ; ?(ts,a*)
+   ; <?CELL(<id>)>ts
+   ; (filter(?(a*,_));Hd; Snd <+ !UNIVERSAL )
+ 
+  squeeze-cell-index =
+    (  ?[x]; !["1", x] <+ squeeze-right(?"1"))
+
+
+  type-cell =
+     nzip((![<id>],id); cart(id) ) 
+   ; map( nzip( \ (x,(y,e)) -> ([<int-to-string>y,<int-to-string> x],e) \ ))
+   ; flatten-list
+   ; !CELL(<id>)
+ 
+
+  insert-tocell-type(|c) = 
+    where(<(squeeze-cell-index,id)>c;?(index,ts))
+   ; ((tc-global <+ tc-var <+ TcExternal; extract-shape) <+ !CELL([]))
+   ; if oncetd(?index)
+     then replace-celltype(|(index,ts))
+     else ?CELL(tsh); !CELL([(index,ts)|tsh])
+     end
+
+  replace-celltype(|ci) =
+    where(!ci => (index,ts))
+    ; oncetd(?(index,_);!ci)

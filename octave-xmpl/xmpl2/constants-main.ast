@@ -1,0 +1,1 @@
+Program([FunDec(VarDef("constants_tb"),[],[],Stats([Assign(Var("a"),"=",Subscript(Var("constants"),[Int(5)])),Assign(Var("a"),"=",Int(6))])),FunDec(VarDef("constants"),[VarDef("a")],[VarDef("c")],Stats([Assign(Var("c"),"=",DataOp("+",[Var("a"),Int(4)])),Assign(Var("data_in"),"=",Int(1))]))])

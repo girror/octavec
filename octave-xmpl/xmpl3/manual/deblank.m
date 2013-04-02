@@ -1,0 +1,1 @@
+all(deblank("asd     ") == "asd")

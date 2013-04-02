@@ -1,0 +1,107 @@
+module TC-DefFunctionShape
+imports integers-lib
+
+rules
+
+
+
+
+ // should cast the values?? 
+ DefShape:
+  |[ ones(a*) ]| -> |[ ones(a*):: ts ]|
+  where <set-type-dimensions(||[int]|)> a* => ts
+
+ DefShape:
+  |[ zeros(a*) ]| -> |[ zeros(a*):: ts ]|
+  where <set-type-dimensions(||[int]|)> a* => ts
+
+ DefShape:
+  |[ rand(a*) ]| -> |[ rand(a*):: ts ]|
+  where <set-type-dimensions(||[float]|)> a* => ts
+
+ DefShape:
+  |[ randn(a*) ]| -> |[ randn(a*):: ts ]|
+  where <set-type-dimensions(||[float]|)> a* => ts
+
+ DefShape:
+  |[ eye(a*) ]| -> |[ eye(a*):: ts ]|
+  where <length>a*;<leq>(<id>,2)
+	;<set-type-dimensions(||[int]|)> a* => ts
+
+ DefShape:
+  |[ all(e::ts,1::ts1) ]| -> |[all(e::ts,1::ts1)::matrix(bool,dim(1,k))  ]|
+  where <GetTypeShape>ts =>|[matrix(t,dim(sh*))]|
+	;!sh* => [Int(r),Int(k)]
+
+ DefShape:
+  |[ all(e::ts,2::ts1) ]| -> |[all(e::ts,1::ts1)::matrix(bool,dim(k,1))  ]|
+  where <GetTypeShape>ts =>|[matrix(t,dim(sh*))]|
+	;!sh* => [Int(k),Int(c)]
+
+
+// DefShape:
+//  |[ horzcat(a*) ]| -> |[ cat(a1*):: ts ]|
+//  where  <map(extract-shape)>a* => sh
+
+
+// DefShape:
+//  |[ vertcat(a*) ]| -> |[ cat(a1*):: ts ]|
+//  where  <map(extract-shape)>a* => sh
+
+
+ DefShape:
+  |[ cat(a1*) ]| -> |[ cat(a1*):: ts ]|
+  where  <Hd;strip-annos>a1* => e
+	; <Tl>a1* => args
+	; <?Int(<string-to-int>)> e => dim
+	; <map(extract-shape); all-list-equal>args => input-dimensions
+	; <num-dimensions>(dim,<id>) => dims
+	; <select-dimension> input-dimensions => val
+        ; <update-dimensions>(dim,dims,val,input-dimensions) 
+	; !MATRIX(INT,<id>) => ts  
+
+
+ update-dimensions =
+  ?(dim,dims,value,lista)
+  ; <length>lista => current-dims
+  ; <subt>(dims,current-dims) => extra-dims
+  ; <append-elems(|extra-dims,Int("1"))>lista
+  ; update-dim(|dim,value)
+
+ update-dim(|index,value) =
+  {lista,val,d:
+    ?dimensions 
+   ; <get-elem-at-index1>(index,dimensions) => d
+   ; <mul;int-to-string>(<?Int(<string-to-int>)>d,value) => val
+   ; <set-elem-at-index1>(index,Int(val),dimensions) 
+  }
+
+ select-dimension =
+  Hd; ?Int(<string-to-int>)
+
+
+  num-dimensions =
+   (id, length) ; max
+
+  append-elems(|n,e) = 
+    <repeat(Append(|e))>(n,<id>);?(_,<id>)
+
+  Append(|e):
+   (n, xs) -> (<subt> (n, 1), <at-end(![e])>xs) where <gt>(n,0)
+
+
+ all-list-equal =
+   !(<Hd>,<Tl>)
+  ; ?(e, elms)
+  ; <foldr(!e, eq; Fst)> elms
+
+
+ set-type-dimensions(|t) =
+    map(?Int(_))
+  ; strip-annos
+  ; try(set-dimensions)
+  ; !MATRIX(t,<id>)
+
+
+ set-dimensions =
+  (?[]; ![Int("1"),Int("1")] <+ ?[x]; ![x,x])

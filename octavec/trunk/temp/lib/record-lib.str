@@ -1,0 +1,15 @@
+module record-lib
+imports Octave
+
+strategies
+
+
+
+ get-root-record =
+   collect(IsVar); Hd 
+
+ rules
+
+ IsVar: Var(x){t*} -> Var(x)
+
+ IsVar: Var(x) -> Var(x)

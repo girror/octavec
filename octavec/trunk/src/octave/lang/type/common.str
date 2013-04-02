@@ -1,0 +1,263 @@
+module octave/lang/type/common
+imports 
+  octave/lang/cons/-
+  octave/general/error
+signature
+  constructors
+    UNIVERSAL : Type 
+    UNKNOWN   : Type 
+strategies
+
+/**
+ * Type and shape helper strategies
+ */
+strategies
+  get-type =
+    \ _{type} -> type \ <+ !UNIVERSAL()
+
+  get-base-type = 
+     is-scalar-type 
+  <+ get-ndarray-base-type
+
+  get-base-scalar-type = 
+    get-base-type ; ?SCALAR(<id>)
+
+  get-ndarray-base-type =
+    \ MATRIX(t,_) -> SCALAR(t) \
+  + \ MATRIX(t)   -> SCALAR(t) \
+
+  calculate-max-numeric-type =
+     one(is-complex-type) ; !COMPLEX()
+  <+ one(is-float-type)   ; !FLOAT()
+  <+ one(is-int-type)     ; !INT()
+  <+ one(is-bool-type)    ; !BOOL()
+
+  is-numeric-type =
+    is-bool-type + is-int-type + is-float-type + is-complex-type
+
+  is-ndarray-type         = ?MATRIX(_,_) + ?MATRIX(_)
+  is-matrix-type          = ?MATRIX(_,[_,_])
+  is-bool-ndarray-type    = is-ndarray-type ; where( get-ndarray-base-type => |[ bool    ]| )
+  is-int-ndarray-type     = is-ndarray-type ; where( get-ndarray-base-type => |[ int     ]| )
+  is-float-ndarray-type   = is-ndarray-type ; where( get-ndarray-base-type => |[ float   ]| )
+  is-complex-ndarray-type = is-ndarray-type ; where( get-ndarray-base-type => |[ complex ]| )
+
+
+  is-cell-type           = ?CELL(_)
+  is-struct-type         = ?RECORD(_)
+
+  is-scalar-type         = ?SCALAR(_) ; not(?SCALAR(ANY_TYPE()))
+  is-bool-type           = ?|[ bool    ]|
+  is-int-type            = ?|[ int     ]|
+  is-float-type          = ?|[ float   ]|
+  is-complex-type        = ?|[ complex ]|
+
+  is-octave-value-type   = ?UNIVERSAL() + ?SCALAR(ANY_TYPE()) + ?MATRIX(ANY_TYPE(),_)
+  is-unit-type           = ?UNIT
+
+  is-numeric-value = 
+    ?|[ i ]|
+  + ?|[ r ]|
+  + ?|[ true ]|
+  + ?|[ false ]|
+
+  is-complete-shape =
+    not(oncetd(UNKNOWN))
+
+  check-type-pair(s) =
+    ?([],[])
+  + ?([UNIVERSAL()|a],[_|b]) 
+  ; <check-type-pair(s)>(a,b)
+  + ?([MANY(t1)|a],[t2|b]) 
+  ; if <s>(t1,t2) then <check-type-pair(s)>([MANY(t1)|a],b) else <check-type-pair(s)>(a,[t2|b]) end
+  + ?([MANY(t)|_],[])
+  + ?([t1|a],[t2|b])
+  ; <s>(t1,t2) 
+  ; <check-type-pair(s)>(a,b)
+
+  check-sep-type = 
+    eq
+  + (dummify-shapes,dummify-shapes) ; (MATRIX(?t10),MATRIX(?t11))
+  ; <check-sep-type>(t10,t11)
+  + (SCALAR(?t2),MATRIX(?t3,[Int("1"),Int("1")])) 
+  ; <check-sep-type>(t2,t3)
+  + (MATRIX(?t4),SCALAR(?t5)) 
+  ; <check-sep-type>(t4,t5)
+  + (MATRIX(?t6,id),SCALAR(?t7)) 
+  ; <check-sep-type>(t6,t7)
+  + (SCALAR(?t8),SCALAR(?t9)) 
+  ; <check-sep-type>(t8,t9)
+  + (UNIVERSAL(),id)
+  + (INT(),FLOAT())
+  + (INT(),BOOL())
+  + (FLOAT(),INT())
+  + (FLOAT(),BOOL())
+  + (BOOL(),INT())
+  + (BOOL(),FLOAT())
+  + (BOOL(),COMPLEX())
+  + (COMPLEX(),INT())
+  + (COMPLEX(),FLOAT())
+  + (COMPLEX(),BOOL())
+  + (NUMERIC(),INT())
+  + (NUMERIC(),FLOAT())
+
+  dummify-shapes =
+    try( \ MATRIX(t,_) -> MATRIX(t) \ )
+
+  type-to-string =
+    \ |[ int     ]| -> "int" \ 
+  + \ |[ bool    ]| -> "bool" \ 
+  + \ |[ float   ]| -> "float" \ 
+  + \ |[ complex ]| -> "complex" \
+  + \ MATRIX(tp,sh) -> <concat-strings>["matrix_of_",<type-to-string>SCALAR(tp),"_"| <map(?Int(<id>)) ; separate-by(|"x")>sh ] \
+  + \ MATRIX(tp)    -> <concat-strings>["matrix_of_",<type-to-string>SCALAR(tp)] \
+  + \ CELL(_)       -> "cell" \
+  + \ STRING(_)     -> "string" \
+  + \ UNIVERSAL()     -> "octave_value" \ 
+
+/**
+ * builtin.ti etc helper strategies
+ */
+strategies
+  read-builtin-specs =
+    <xtc-find>"builtin.ti"
+  ; read-types-from-file
+  ; desugar-typedef
+  ; set-definitions
+
+  read-types-from-file =
+    !FILE(<id>)
+  ; xtc-temp-files(
+      xtc-transform(!"sglri",!["-p",<xtc-find>"type-specification.tbl"])
+    ; read-from 
+    )
+
+  set-definitions = 
+    ?ProgDecls(constants,variables,funcs,mappings,decls)
+  ; <get-variables> variables => vars
+  ; <get-functions> funcs => func-signatures
+  ; generate-function-rules
+  ; <get-mappings-functions> mappings => func-mappings
+  ; generate-mapping-rules
+  ; <get-constants> constants => cs
+  ; generate-constants-rules
+  ; ![cs, vars, func-signatures, func-mappings]
+
+  generate-constants-rules = 
+    ?Constants(<map({ ?VarTyped(v,t) ; rules( type-of-constant : v -> t ) })>)
+
+  generate-function-rules =
+    let generate-function-rule = 
+          { ?FunctionSig(f,as,rs)
+          ; <length>as => al
+          ; <length>rs => rl
+          ; rules(
+              type-of-builtin-call(|n) :+ 
+                |[ f(a*) ]| -> [ts] 
+                  where //debug; <debug(!"(n,rl) == ")>(n,rl);
+                    !n => rl 
+                  ; <map(get-octave-type)>a* => ct
+                  ; if fetch-elem(UNIVERSAL()) then
+                      <check-type-pair(id)>(as,ct)
+                    ; ti-warning(|<concat-strings>[ "Typechecking for call to builtin function "
+                                                  , f 
+                                                  , " will be done at runtime"])
+                    ; ![UNIVERSAL()]
+                    else 
+                      <check-type-pair(check-sep-type)>(as,ct) ; !rs 
+                    end 
+		  ; try(?[<id>]) => ts
+            )
+          }
+    in ?LibFuncs(<map(generate-function-rule)>)
+    end
+
+  generate-mapping-rules =
+    let generate-mapping-rule = 
+          { ?FunctionSig(f,as,rs)
+          ; ti-builtin-debug
+          ; <length>as => al
+          ; <length>rs => rl
+          ; rules(
+              type-of-mapping-call(|n) :+ 
+                |[ f(a*) ]| -> [ ts ] 
+                  where 
+                    !n => rl 
+                  ; <map(get-octave-type)>a* => ct
+                  ; if fetch-elem(UNIVERSAL()) then
+                      <check-type-pair(id)>(as,ct)
+                    ; ti-warning(|<concat-strings>[ "Typechecking for call to mapping function "
+                                                  , f 
+                                                  , " will be done at runtime"])
+                    ; ![UNIVERSAL()]
+                    else 
+                      <check-type-pair(check-sep-type)>(as,ct) ; !rs
+                    end => ts 
+            )
+          }
+    in ?MappingFuncs(<map(generate-mapping-rule)>)
+    end
+
+  get-constants = 
+    ?[<id>] <+ !Constants([])
+
+  get-variables = 
+    ?[<id>] <+ !Variables([])
+
+  get-functions =
+    ?[<id>] <+ !LibFuncs([])
+
+  get-mappings-functions =
+    ?[<id>] <+ !MappingFuncs([])
+
+  desugar-typedef =
+   bottomup(try(TypeDesugar + flatten-list))
+
+  TypeDesugar:
+   SCALAR(ANY_TYPE()) -> UNIVERSAL()
+   
+  TypeDesugar:
+   MATRIX(ANY_TYPE()) -> MATRIX(UNIVERSAL())
+   
+  TypeDesugar:
+   MATRIX(ANY_TYPE(),_) -> MATRIX(UNIVERSAL())
+
+  TypeDesugar:
+   ONE_MANY(t) -> [t,MANY(t)]
+
+// XXX
+  get-octave-type =
+    \ _{[t]} -> t \ <+ \ _{t} -> t \ <+ !UNIVERSAL()
+
+  is-matrix-type         = [MATRIX(id,list(id))] + MATRIX(id,list(id))
+  is-bool-matrix-type    = [MATRIX(BOOL(),list(id))] + MATRIX(BOOL(),list(id))
+  is-int-matrix-type     = [MATRIX(INT(),list(id))] + MATRIX(INT(),list(id))
+  is-float-matrix-type   = [MATRIX(FLOAT(),list(id))] + MATRIX(FLOAT(),list(id))
+  is-complex-matrix-type = [MATRIX(COMPLEX(),list(id))] + MATRIX(COMPLEX(),list(id))
+  is-char-matrix-type    = [MATRIX(CHAR(),list(id))] + MATRIX(CHAR(),list(id))
+
+  is-ndarray-type         = ?[MATRIX(_,_)] + ?[MATRIX(_)]
+  is-bool-ndarray-type    = ?[MATRIX(BOOL(),_)] + ?[MATRIX(BOOL())]
+  is-int-ndarray-type     = ?[MATRIX(INT(),_)] + ?[MATRIX(INT())]
+  is-float-ndarray-type   = ?[MATRIX(FLOAT(),_)] + ?[MATRIX(FLOAT())]
+  is-complex-ndarray-type = ?[MATRIX(COMPLEXv,_)] + ?[MATRIX(COMPLEX())]
+  is-char-ndarray-type    = ?[MATRIX(CHAR(),_)] + ?[MATRIX(CHAR())]
+
+  is-range-type          = ?[RANGE(_)] + ?[RANGE()] + ?RANGE(_) + ?RANGE()
+  is-int-range-type      = ?[RANGE(INT(),_)]
+  is-float-range-type    = ?[RANGE(FLOAT(),_)]
+
+  is-cell-type           = ?[CELL(_)]
+  is-struct-type         = ?[RECORD(_)]
+
+  is-scalar-type         = ?[SCALAR(_)] ; not(?[SCALAR(ANY_TYPE())])      //+ ?MATRIX(_,[Int("1"),Int("1")])
+  is-bool-type           = ?[SCALAR(BOOL())]    //+ ?MATRIX(BOOL,[Int("1"),Int("1")])
+  is-int-type            = ?[SCALAR(INT())]     //+ ?MATRIX(INT,[Int("1"),Int("1")])
+  is-float-type          = ?[SCALAR(FLOAT())]   //+ ?MATRIX(FLOAT,[Int("1"),Int("1")])
+  is-complex-type        = ?[SCALAR(COMPLEX())] //+ ?MATRIX(COMPLEX,[Int("1"),Int("1")])
+  is-char-type           = ?[SCALAR(CHAR())] 
+
+  is-octave-value-type   = ?[UNIVERSAL()] + ?[SCALAR(ANY_TYPE())] + ?[MATRIX(ANY_TYPE(),_)] + ?[]
+  is-unit-type           = ?[UNIT]
+
+

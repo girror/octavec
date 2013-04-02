@@ -1,0 +1,348 @@
+module TC-Assignments
+
+rules 
+
+  TcAssg: 
+   |[ x = (e :: ts) ]| -> |[ x :: ts1 = (e :: ts1) ]| 
+	//|[ x :: ts1 = (e :: ts1) ]|
+   where  <GetTypeShape> ts => ts1
+	; <create-typing-rule>(|[ x ]|,|[ ts1 ]|,|[ e ]|)
+ /**
+  *  assignment of record fields v.f
+  */
+  TcAssg(tc):
+  |[ lv.f = (e::ts)]| ->   |[ lv1 = (e::ts)]|
+  where  <GetTypeShape> ts => ts1
+	; <get-root-record> |[ lv.f ]| => |[ x ]|	
+	; get-add-to-record(|ts1, |[lv.f]|)
+	; <create-type-rule>(|[ x ]|,<id>)
+	; rules(
+	    GetVal: |[ lv.f ]| -> |[ e::ts ]|
+          )
+	; <tc> |[ lv.f ]| => |[ lv1 ]|
+
+  /**
+   * definition of a cell unknown
+   */
+  TcAssg(tc): 
+   |[ lv{a*} = (e :: ts) ]| -> |[ lv::ts1{a*} :: ts  = (e :: ts) ]|
+   where <get-root-record> |[ lv ]| => |[ x ]|
+	;!CELL([]) => ts1
+	; <create-typing-rule> (|[ x ]|,CELL([]),|[ e ]|)
+
+
+  /**
+   * definition of a cell
+   */
+  TcAssg(tc): 
+   |[ lv{a*} = (e :: ts) ]| -> |[ lv1{a*} :: ts  = (e :: ts) ]|
+   where <map(?Int(<id>))>a* => a1*
+	; <get-root-record> |[ lv ]| => |[ x ]|
+	; insert-tocell-type(|(a1*,<GetTypeShape> ts))
+	; <create-typing-rule>(|[ x ]|,<id>,|[ e ]|)
+	; <tc> lv => lv1
+
+  /**
+   * Matrix reshape only !!
+   */	
+  TcAssg(tc): 
+   |[ lv[ a* ] = (e:: ts) ]| -> |[ lv1[a*] :: ts  = (e :: ts) ]|
+   where <get-root-record> |[ lv ]| => |[ x ]|
+	; <tc-global <+ tc-var <+ TcExternal>|[ x ]| => |[x :: ts1]|
+	; <GetAType>ts =>t
+	; <create-typing-rule>(|[ x ]|,MATRIX(t,[SKIP,SKIP]) ,|[ e ]|)
+	; <tc> lv => lv1 
+       // ; debug(!"IN reshape ")  
+
+
+
+  /**
+   * Matrix update only !!
+   */	
+  TcAssg(tc): 
+   |[ lv[ a* ] = (e:: ts) ]| -> |[ lv1[a1*] :: ts  = (e :: ts) ]|
+   where <get-root-record> |[ lv ]| => |[ x ]|
+	; <tc-global <+ tc-var <+ TcExternal>|[ x ]| => |[x :: ts1]|
+	; <update-matrix>(a*,ts1,ts) => a1*
+	; <tc> lv => lv1 
+        //; debug(!"IN UPDATE ;-) ")  
+
+
+ /**
+  * first definition of a matrix
+  */ 
+  TcAssg(tc): 
+   |[ lv[a*] = (e :: ts) ]| -> |[ lv1[a1*] :: matrix(t,dim(sh*)) = (e :: ts) ]|
+   where  <get-root-record> |[ lv ]| => |[ x ]|
+	; <not(TcVar + TcGlobal)>|[ x ]|
+	; <GetAType>ts => t
+	; <first-matrix-assignment>(a*, ts) => (a1*,sh*) 
+	; <create-typing-rule>(|[ x ]|,|[ matrix(t,dim(sh*)) ]|,|[ e ]|)
+	; <tc> lv => lv1
+
+
+  // MULTI ASSIGNMENT
+
+  TcAssg(tc):
+   |[ [lvs*] = ( e :: ts) ]| -> |[ [lvs1*] = (e::ts)]|
+  where  <assign-type(tc)> (lvs*, ts) => lvs1* 
+
+  TcAssg(tc):
+   |[ [lvs*] = ( e :: ts) ]| ->  <assign-values(tc)> (lvs*, e)
+
+strategies
+
+
+ update-matrix = 
+     ?(a*, ts1, ts)
+    ; (id, GetShape, GetShape)
+    ; (update-colon-shape-preserving <+ update-exp-preserve-shape)
+
+
+// ------ UPDATE MATRIX ------------------
+
+
+ update-exp-preserve-shape =
+   update-eq-shape-index 
+
+
+
+/*  <+  update-lt-shape-index
+
+
+
+  update-lt-shape-index =//?(a*,original-shape,exp-shape) => a1*
+     ?(a*,ts1,ts) 
+     ; where(<(length,length);lt>(a*,ts1)   
+         ; <check-boundary-index> (a*,ts1) 
+       ) 
+     ; (<has-scalar-shape>ts; <fix-colons>(a*, ts1) 
+        <+ <check-index-rshape>  (a*,ts1,ts)
+       )  
+ */
+
+
+
+
+
+  /** update-exp-preserve-shape when 
+   *  index length = # of dims
+   */
+  update-eq-shape-index =//?(a*,original-shape,exp-shape) => a1*
+     ?(a*,ts1,ts) 
+     ; where(<(length,length);(eq <+ ?(1,2)) >(a*,ts1)   
+         ; <check-boundary-index> (a*,ts1) 
+       ) 
+     ; (<has-scalar-shape>ts; <fix-colons>(a*, ts1) 
+        <+ <check-index-rshape>  (a*,ts1,ts)
+       )  
+
+
+
+
+ check-index-rshape= 
+   ?(a*,ts1,ts)
+  ; <fix-colons>(a*,ts1)
+  ; <compute-shape-subscript(fix-dimensions)> (<id>,ts1) => a1*
+  ; where( <eq>(a1*,ts)
+       <+ <squeeze-right(?Int("1"))>a1* => a-right
+	; <squeeze-left(?Int("1"))>a1*  => a-left
+        ; <squeeze-right(?Int("1"))>ts  => ts-right
+	; <squeeze-left(?Int("1"))>ts  =>  ts-left
+        ; (<?a-right + ?a-left> ts-right
+	   <+ <?a-right + ?a-left> ts-left )
+   )
+ 
+      
+ check-boundary-index = 
+   try(index-vector-as-matrix)
+   ; index-leq-shape  
+
+ index-leq-shape =
+   zip( \ (idx,d) -> () where <eq>(idx,d) <+ <Check(leqS)>(idx, d)  \ )
+
+
+ index-vector-as-matrix =
+   ?([idx],dims)
+   ;!([idx,Int("1"){SCALAR(INT)}],dims)
+
+
+rules
+
+ Check(s):
+  (|[ i ]|,|[ j ]|) -> |[ i ]|
+   where <s>(i,j)
+
+ Check(s):
+  (e, |[ i ]|) -> |[ i ]|
+   where <True() + False()> e
+
+ Check(s):
+  (|[ (:) ]|, e) -> e
+
+
+strategies 
+
+ 
+
+// ALL COLONS in index of subscript - preserve shape
+//?(a*,original-shape,exp-shape)
+  update-colon-shape-preserving = 
+     ?(a*,ts1,ts) 
+   ; (all-colons, id, id) 
+   ; <preserve-matrix-colon>(a*, ts1) => sh1* 
+   ; <preserve-matrix-colon>(a*, ts)  => sh1*
+   ; <fix-colons>(a*, ts) => a1*
+
+
+  preserve-matrix-colon =
+      ?(a*,dims) 
+   ; <take-while(?Colon); length> a* => colons
+   ; <leq>(colons,<length>dims)
+   ; <length; dec> a* => tt
+   ; <take(!tt)<+ ![]> dims => shape
+   ; <drop(!tt) <+ !dims> dims 
+   ; matrix-shape =>  shape-colon
+   ; <conc>(shape,[Int(shape-colon)])
+   ; try(fix-dimensions)
+
+
+
+
+
+
+
+  // FIRST ASSIGNMENT of MATRIX
+
+  first-matrix-assignment =
+    (id, GetShape)
+    ;(first-shape-all-colon <+ first-shape-expression <+ first-shape-array)
+
+
+  /**
+   *  FIRST ASSIGNMENT OF a
+   * a(:) = ones(7,1)     => a(1,7)
+   * a(:,:,:) = ones(3,3) => a(3,3)
+   */
+  first-shape-all-colon = //(a*,sh*) => (a1*,sh1*)
+     (all-colons,id) 
+   ; try(remove-index-padding)
+   ; (shape-magic-colon1 <+ shape-colon )
+
+  shape-colon =
+     ?(a*,sh*)
+   ; zip(id)
+   ; <fix-colons> (a*, sh*)
+   ; !(<id>, sh*)
+
+  shape-magic-colon1 = 
+   magic-colon1
+   ; ?(a*, sh*)
+   ; <matrix-shape>sh* => shape 
+   ; <fix-colons>(a*,[Int(shape),Int("1")]) 
+   ; !(<id>,[Int("1"),Int(shape)])
+  
+
+  all-colons =
+   map(?Colon)
+  
+  magic-colon1 =
+   where((length,length); ?(1,2))
+   
+
+  /**
+   * if colon expressions are mixed with
+   * expressions then colon is 1:1:1
+   * rvalue should be an scalar
+   */
+  first-shape-expression =
+   ?(a*, sh*)
+   ; (id, has-scalar-shape)
+   ; <map(try( \Colon -> Int("1"){SCALAR(INT)} \ ))> a*
+   ; squeeze-index(?Int("1"))
+   ; try(fix-dimensions) 
+   ; !(<map(try(\e -> e{SCALAR(INT)} where not(has-annos) \ ) )>,  <strip-annos>)
+
+
+
+  arrange-index =
+   arrange-index-magic-colon <+ arrange-index-expression
+
+  arrange-index-magic-colon =
+  ?(a*, dims)
+  ; where(
+      <has-index-magic-colon> a*
+      ;!Colon{MATRIX(INT,[Int("1"),SKIP])} => e
+    )
+  ;<add-padding(|e)>(a*,dims)
+    
+ 
+ arrange-index-expression =
+  ?(a*, dims)
+  ; where(
+      <not(has-index-magic-colon)> a*
+      ;!Int("1"){SCALAR(INT)} => e
+   )
+  ; <add-padding(|e)>(a*,dims)
+
+  /**
+   * a([3,4,5],[6,2,4],3) = ones(3,3)
+   */
+  first-shape-array =
+    ?(a*,dims)
+   ; !(a*,[SKIP,SKIP])
+
+
+ //-- strategies for Multiassign  
+
+  assign-values(s) =
+     ?(lvs*, e)
+    ; <?Matrix([<id>])>e
+    ; <zip(\(x, e1) -> <s> Silent(Assign(x,"=",e1))\)> (lvs*, <id>)
+    ;!Stats(<id>)
+
+  assign-type(tc) =
+    zip(assign-var-type(tc))
+
+  assign-var-type(tc) =
+  { lvalue, ts:
+    ?(lvalue, ts)
+   ; !Assign(lvalue,"=", Var(<new>){ts})
+   ; tc
+   ; ?Assign(<id>,"=",_)
+  }
+  
+
+//-- Rule creation rules  
+
+ create-typing-rule =
+     ?val@(var,ts,e)
+    ; <create-type-rule>(var,ts) 
+    ; <try(create-getval-rule)> val
+
+
+ create-type-rule =
+  {x,ts: 
+     (id,GetTypeShape)
+    ;?(|[x]|, |[ts]|) 
+    ;where(
+        ( <IsGlobal>|[ x ]|; rules(TcGlobal: |[ x ]| -> |[ x :: ts ]|)
+          <+  rules(TcVar: |[ x ]| -> |[ x :: ts ]| )
+        )
+     )
+  }
+
+
+  create-getval-rule =
+    {x,ts,e: ?(|[x]|,ts,|[ e ]|)
+	; where(<not(?|[y]|)>e ; <is-const> e)
+	; rules(GetVal: |[ x ]| -> |[ e::ts ]|)
+    }
+
+
+  get-simple-type =
+      GetAType 
+    ; where(not(?RECORD(_))) 
+
+
+

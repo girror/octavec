@@ -1,0 +1,24 @@
+module octave-xmpl
+imports liblib
+
+strategies
+
+  io-octave-xmpl =
+    option-wrap(octave-xmpl-options, 
+      xtc-output(
+        <get-example; xtc-find-file> ()
+      )
+    )
+
+  octave-xmpl-options =
+       ArgOption("-x"
+       , where(<set-config> ("--xmpl", <id>))
+       , !"-x name          generate example name (required, without extension)"
+       )
+    <+ output-options
+
+  get-example =
+      <get-config> "--xmpl"
+    ; <conc-strings> (<id>, ".tbm")
+    <+ <fatal-error> ["** ERROR: you must specify an example"]
+

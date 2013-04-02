@@ -1,0 +1,871 @@
+function [ ] = global_settings ( )
+    {
+      global PACKET_LENGTH
+      global NET_PACKET_LENGTH
+      global PACKETS_PER_PRBS_PERIOD
+      global SYNC_BYTE_VALUE
+      global INV_SYNC_BYTE_VALUE
+      global INIT_PRBS_REGISTER
+      global RS_PARITY_BYTES
+      global OI_I
+      global OI_M
+      global INIT_CONV_REGISTER
+      global PUNCTURING_MODE
+      global QAM_MODE
+      global LOG_QAM_MODE
+      ffffffff = flipud ( [ 1 2 ] )
+      rrrrrrrr = rows ( [ 1 2 ] )
+      ffxxxxxx = diff ( [ 1 2 8 ] , 1 )
+      PACKETS_PER_PRBS_PERIOD = 8
+      PACKET_LENGTH = 188
+      NET_PACKET_LENGTH = PACKET_LENGTH - 1
+      SYNC_BYTE_VALUE = hex2dec ( '47' )
+      INV_SYNC_BYTE_VALUE = hex2dec ( 'b8' )
+      INIT_PRBS_REGISTER = [ 1 0 0 1 0 1 0 1 0 0 0 0 0 0 0 ]
+      RS_PARITY_BYTES = 16
+      OI_I = 12
+      OI_M = 17
+      INIT_CONV_REGISTER = zeros ( 1 , 6 )
+      PUNCTURING_MODE = 0.66666668653488159
+      QAM_MODE = 16
+      LOG_QAM_MODE = log2 ( QAM_MODE )
+    }
+end
+function [ y ] = flipud ( x )
+    {
+      ifthen nargin ~= 1
+        then
+        usage ( 'flipud (x)' )
+      endifthen
+      nr = rows ( x )
+      y = x [ nr : - 1 : 1 , (:) ]
+    }
+end
+function [ nr ] = rows ( x )
+    {
+      ifthen nargin ~= 1
+        then
+        usage ( 'rows (x)' )
+      endifthen
+      [ nr , nc ] = size ( x )
+    }
+end
+function [ x ] = diff ( x , k )
+    {
+      if nargin == 1
+        then
+        k = 1
+        else
+        if nargin == 2
+          then
+          if ~ ( is_scalar ( k ) & k == round ( k ) & k >= 0 )
+            then
+            error ( 'diff: k must be a nonnegative integer' )
+            else
+            ifthen k == 0
+              then
+              return
+            endifthen
+          endif
+          else
+          usage ( 'diff (x, k' )
+        endif
+      endif
+      if isstr ( x )
+        then
+        error ( 'diff: symbolic differentiation not (yet) supported' )
+        else
+        if is_vector ( x )
+          then
+          {
+            n = length ( x )
+            if n <= k
+              then
+              x = [ ]
+              else
+              for i = 1 : 1 : k
+                 x = x [ 2 : 1 : n - i + 1 ] - x [ 1 : 1 : n - i ]
+              endfor
+            endif
+          }
+          else
+          if is_matrix ( x )
+            then
+            {
+              n = rows ( x )
+              if n <= k
+                then
+                x = [ ]
+                else
+                for i = 1 : 1 : k
+                   x = x [ 2 : 1 : n - i + 1 , (:) ] - x [ 1 : 1 : n - i , (:) ]
+                endfor
+              endif
+            }
+            else
+            x = [ ]
+          endif
+        endif
+      endif
+    }
+end
+function [ retval ] = is_scalar ( x )
+    {
+      retval = 0
+      if nargin == 1
+        then
+        ifthen is_matrix ( x )
+          then
+          {
+            [ nr , nc ] = size ( x )
+            retval = nr == 1 & nc == 1
+          }
+        endifthen
+        else
+        usage ( 'is_scalar (x)' )
+      endif
+    }
+end
+function [ retval ] = is_vector ( x )
+    {
+      retval = 0
+      if nargin == 1
+        then
+        ifthen is_matrix ( x )
+          then
+          {
+            [ nr , nc ] = size ( x )
+            retval = nr == 1 & nc >= 1 | nc == 1 & nr >= 1
+          }
+        endifthen
+        else
+        usage ( 'is_vector (x)' )
+      endif
+    }
+end
+function [ d ] = hex2dec ( h )
+    if nargin ~= 1
+      then
+      usage ( 'hex2dec (b)' )
+      else
+      d = base2dec ( h , 16 )
+    endif
+end
+function [ out ] = base2dec ( d , base )
+    {
+      ifthen nargin ~= 2
+        then
+        usage ( 'n = base2dec('d', base)' )
+      endifthen
+      symbols = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+      if isstr ( base )
+        then
+        {
+          symbols = base
+          base = length ( symbols )
+          ifthen any ( diff ( sort ( toascii ( symbols ) ) ) == 0 )
+            then
+            error ( 'base2dec: symbols representing digits must be unique.' )
+          endifthen
+        }
+        else
+        if ~ ( is_scalar ( base ) )
+          then
+          error ( 'base2dec: cannot convert from several bases at once.' )
+          else
+          if base < 2 | base > length ( symbols )
+            then
+            error ( 'base2dec: base must be between 2 and 36 or a string of symbols' )
+            else
+            d = toupper ( d )
+          endif
+        endif
+      endif
+      d = strjust ( d , 'right' )
+      table = (NaN * ones ( 256 , 1 ))
+      table [ toascii ( symbols [ 1 : 1 : base ] ) ] = 0 : 1 : base - 1
+      table [ toascii ( ' ' ) ] = 0
+      d = reshape ( table [ toascii ( d ) ] , size ( d ) )
+      out = (d * base .^ ' ( columns ( d ) - 1 : - 1 : 0 ))
+    }
+end
+function [ x ] = strjust ( x , just )
+    {
+      ifthen nargin < 1 | nargin > 2
+        then
+        usage ( 'strjust (s, ['left'|'right'|'center'])' )
+      endifthen
+      ifthen nargin == 1
+        then
+        just = 'right'
+      endifthen
+      just = tolower ( just )
+      dfi = do_fortran_indexing
+      unwind_protect
+        {
+          do_fortran_indexing = 1
+          idx = find ( toascii ( x ) == 0 )
+          ifthen ~ ( isempty ( idx ) )
+            then
+            x [ idx ] = ' '
+          endifthen
+          [ nr , nc ] = size ( x )
+          idx = ' ( x ) ~= ' '
+          if strcmp ( just , 'right' )
+            then
+            {
+              [ N , hi ] = max ( cumsum ( idx ) )
+              shift = hi
+            }
+            else
+            if strcmp ( just , 'left' )
+              then
+              {
+                [ N , lo ] = max ( cumsum ( flipud ( idx ) ) )
+                shift = nc - lo
+              }
+              else
+              {
+                [ N , hi ] = max ( cumsum ( idx ) )
+                [ N , lo ] = max ( cumsum ( flipud ( idx ) ) )
+                shift = ceil ( nc - lo - hi / 2 )
+              }
+            endif
+          endif
+          idx = rem ( (ones ( nr , 1 ) * [ 0 : 1 : nc - 1 ]) + (' ( shift ) * ones ( 1 , nc )) , nc )
+          x = x [ (idx * nr) + (' ( [ 1 : 1 : nr ] ) * ones ( 1 , nc )) ]
+        }
+      unwind_protect_cleanup
+        do_fortran_indexing = dfi
+      end_unwind_protect
+    }
+end
+function [ status ] = strcmp ( s1 , s2 )
+    {
+      ifthen nargin ~= 2
+        then
+        usage ( 'strcmp (s, t)' )
+      endifthen
+      status = 0
+      ifthen isstr ( s1 ) & isstr ( s2 )
+        then
+        {
+          [ r1 , c1 ] = size ( s1 )
+          [ r2 , c2 ] = size ( s2 )
+          ifthen r1 == r2 & c1 == c2
+            then
+            if c1 == 0
+              then
+              status = 1
+              else
+              status = all ( all ( s1 == s2 ) )
+            endif
+          endifthen
+        }
+      endifthen
+    }
+end
+function [ retval ] = rem ( x , y )
+    {
+      usage_msg = 'rem (x, y)'
+      ifthen nargin ~= 2
+        then
+        usage ( usage_msg )
+      endifthen
+      ifthen any ( size ( x ) ~= size ( y ) ) & ~ ( is_scalar ( x ) | is_scalar ( y ) )
+        then
+        error ( 'rem: argument sizes must agree' )
+      endifthen
+      ifthen any ( any ( imag ( x ) ) ) | any ( any ( imag ( y ) ) )
+        then
+        error ( 'rem: complex arguments are not allowed' )
+      endifthen
+      if nargin == 2
+        then
+        retval = x - y .* fix ( x ./ y )
+        else
+        error ( usage_msg )
+      endif
+    }
+end
+function [ retval ] = reshape ( a , m , n )
+    {
+      ifthen nargin == 2 & prod ( size ( m ) ) == 2
+        then
+        {
+          n = m [ 2 ]
+          m = m [ 1 ]
+          nargin = 3
+        }
+      endifthen
+      if nargin == 3
+        then
+        {
+          [ nr , nc ] = size ( a )
+          if (nr * nc) == (m * n)
+            then
+            {
+              retval = zeros ( m , n )
+              ifthen isstr ( a )
+                then
+                retval = setstr ( retval )
+              endifthen
+              retval [ (:) ] = a
+            }
+            else
+            error ( 'reshape: sizes must match' )
+          endif
+        }
+        else
+        usage ( 'reshape (a, m, n) or reshape (a, size (b))' )
+      endif
+    }
+end
+function [ nc ] = columns ( x )
+    {
+      ifthen nargin ~= 1
+        then
+        usage ( 'columns (x)' )
+      endifthen
+      [ nr , nc ] = size ( x )
+    }
+end
+function [ f , e ] = log2 ( x )
+    {
+      ifthen nargin ~= 1
+        then
+        usage ( 'y = log2 (x) or [f, e] = log2 (x)' )
+      endifthen
+      if nargout < 2
+        then
+        f = log ( x ) / log ( 2 )
+        else
+        if nargout == 2
+          then
+          {
+            x = real ( x )
+            f = abs ( x ) + x == 0
+            e = floor ( log ( f ) / log ( 2 ) ) + 1 .* x ~= 0
+            f = sign ( x ) .* f ./ 2 .^ e
+          }
+          else
+          error ( 'log2 takes at most 2 output arguments' )
+        endif
+      endif
+    }
+end
+function [ data_channel_in ] = dvbt_send ( data_in )
+    {
+      fprintf ( '  dvbt_send (%d)
+' , length ( data_in ) )
+      global PACKETS_PER_PRBS_PERIOD
+      global dvbt_send_current_packet
+      global dvbt_send_prbs_register
+      global dvbt_send_conv_regigster
+      dvbt_send_current_packet = 0
+      data = data_in
+      data = sync_and_scramble ( data )
+      data = rs_encode ( data )
+      data = outer_interleave ( data )
+      data = bit_from_byte_vector ( data )
+      [ x , y ] = convolutional_encode ( data )
+      data = puncturing ( x , y )
+      data_channel_in = data
+      dvbt_send_current_packet = rem ( dvbt_send_current_packet + 1 , PACKETS_PER_PRBS_PERIOD )
+    }
+end
+function [ data_out ] = sync_and_scramble ( data_in )
+    {
+      fprintf ( '    sync_and_scramble (%d)
+' , length ( data_in ) )
+      global PACKET_LENGTH
+      global NET_PACKET_LENGTH
+      global PACKETS_PER_PRBS_PERIOD
+      global SYNC_BYTE_VALUE
+      global INV_SYNC_BYTE_VALUE
+      global INIT_PRBS_REGISTER
+      global dvbt_send_current_packet
+      global dvbt_send_prbs_register
+      global dvbt_send_convolution_state
+      if dvbt_send_current_packet == 0
+        then
+        {
+          dvbt_send_prbs_register = INIT_PRBS_REGISTER
+          sync_byte = INV_SYNC_BYTE_VALUE
+        }
+        else
+        {
+          dvbt_send_current_packet [ 1 ]
+          sync_byte = SYNC_BYTE_VALUE
+        }
+      endif
+      [ prbs , dvbt_send_prbs_register ] = prbs_sequence ( NET_PACKET_LENGTH , dvbt_send_prbs_register )
+      data_out = [ sync_byte ; byte_xor ( data_in , prbs ) ]
+    }
+end
+function [ sequence , prbs_register_out ] = prbs_sequence ( byte_length , prbs_register )
+    {
+      fprintf ( '      prbs_sequence
+' )
+      bit_length = (8 * byte_length)
+      bit_sequence = zeros ( bit_length , 1 )
+      for i = 1 : 1 : bit_length
+         {
+           new_bit = xor ( prbs_register [ 14 ] , prbs_register [ 15 ] )
+           prbs_register = [ new_bit prbs_register [ 1 : 1 : 14 ] ]
+           bit_sequence [ i ] = new_bit
+         }
+      endfor
+      sequence = zeros ( byte_length , 1 )
+      for i = 1 : 1 : byte_length
+         for j = 1 : 1 : 8
+            sequence [ i ] = sequence [ i ] + (bit_sequence [ (8 * i - 1) + j ] * 2 ^ 8 - j)
+         endfor
+      endfor
+      prbs_register_out = prbs_register
+    }
+end
+function [ z ] = xor ( x , y )
+    if nargin == 2
+      then
+      if is_scalar ( x ) | is_scalar ( y ) | size ( x ) == size ( y )
+        then
+        z = logical ( x | y - x & y )
+        else
+        error ( 'xor: x and y must be of common size or scalars' )
+      endif
+      else
+      usage ( 'xor (x, y)' )
+    endif
+end
+function [ y ] = logical ( x )
+    if nargin == 1
+      then
+      if islogical ( x ) | isempty ( x )
+        then
+        y = x
+        else
+        if isnumeric ( x )
+          then
+          y = x ~= 0
+          else
+          error ( 'logical not defined for type `%s'' , typeinfo ( x ) )
+        endif
+      endif
+      else
+      usage ( 'logical (x)' )
+    endif
+end
+function [ result ] = byte_xor ( byte_vector1 , byte_vector2 )
+    {
+      fprintf ( '      byte_xor
+' )
+      result = byte_vector1
+      for i = 1 : 1 : length ( byte_vector1 )
+         {
+           byte1 = byte_vector1 [ i ]
+           byte2 = byte_vector2 [ i ]
+           result_byte = 0
+           for j = 1 : 1 : 8
+              {
+                bit1 = rem ( byte1 , 2 )
+                bit2 = rem ( byte2 , 2 )
+                result_bit = xor ( bit1 , bit2 )
+                result_byte = result_byte + (result_bit * 2 ^ j - 1)
+                byte1 = fix ( byte1 / 2 )
+                byte2 = fix ( byte2 / 2 )
+              }
+           endfor
+           result [ i ] = result_byte
+         }
+      endfor
+    }
+end
+function [ data_out ] = rs_encode ( data_in )
+    {
+      fprintf ( '    rs_encode (%d)
+' , length ( data_in ) )
+      global PACKET_LENGTH
+      global RS_PARITY_BYTES
+      ifthen length ( data_in ) ~= PACKET_LENGTH
+        then
+        {
+          fprintf ( 'error: rs_endcode: packet size %d is not expected %d.
+' , length ( data_in ) , PACKET_LENGTH )
+          return
+        }
+      endifthen
+      data_out = [ data_in ; zeros ( RS_PARITY_BYTES , 1 ) ]
+    }
+end
+function [ data_out ] = outer_interleave ( data_in )
+    {
+      fprintf ( '    outer_interleave (%d)
+' , length ( data_in ) )
+      global PACKET_LENGTH
+      global RS_PARITY_BYTES
+      global OI_I
+      global OI_M
+      data = reshape ( data_in , OI_I , OI_M )
+      data_out = reshape ( .' ( data ) , PACKET_LENGTH + RS_PARITY_BYTES , 1 )
+    }
+end
+function [ data_out ] = bit_from_byte_vector ( data_in )
+    {
+      fprintf ( '    bit_from_byte_vector (%d)
+' , length ( data_in ) )
+      data_out = zeros ( (length ( data_in ) * 8) , 1 )
+      for i = 1 : 1 : length ( data_in )
+         {
+           data_byte = data_in [ i ]
+           for j = 1 : 1 : 8
+              {
+                ifthen data_byte >= 127.5
+                  then
+                  data_out [ (8 * i - 1) + j ] = 1
+                endifthen
+                data_byte = (rem ( data_byte , 128 ) * 2)
+              }
+           endfor
+         }
+      endfor
+    }
+end
+function [ x , y ] = convolutional_encode ( data )
+    {
+      fprintf ( '    convolutional_encode (%d)
+' , length ( data ) )
+      global INIT_CONV_REGISTER
+      global dvbt_send_current_packet
+      global dvbt_send_conv_register
+      ifthen dvbt_send_current_packet == 0
+        then
+        dvbt_send_conv_register = INIT_CONV_REGISTER
+      endifthen
+      x = zeros ( length ( data ) , 1 )
+      y = zeros ( length ( data ) , 1 )
+      for i = 1 : 1 : length ( data )
+         {
+           data_in = data [ i ]
+           x [ i ] = data_in
+           for j = [ 1 2 3 6 ]
+              x [ i ] = xor ( x [ i ] , dvbt_send_conv_register [ j ] )
+           endfor
+           y [ i ] = data_in
+           for j = [ 2 3 5 6 ]
+              y [ i ] = xor ( y [ i ] , dvbt_send_conv_register [ j ] )
+           endfor
+           dvbt_send_conv_register = [ data_in dvbt_send_conv_register [ 2 : 1 : 6 ] ]
+         }
+      endfor
+    }
+end
+function [ data ] = puncturing ( x , y )
+    {
+      fprintf ( '    puncturing (%d)
+' , length ( x ) )
+      global PUNCTURING_MODE
+      if PUNCTURING_MODE == 0.5
+        then
+        {
+          data = zeros ( (2 * length ( x )) , 1 )
+          for i = 1 : 1 : length ( x )
+             {
+               data [ (2 * i - 1) + 1 ] = x [ i ]
+               data [ (2 * i - 1) + 2 ] = y [ i ]
+             }
+          endfor
+        }
+        else
+        if PUNCTURING_MODE == 0.66666668653488159
+          then
+          {
+            data = zeros ( (3 * length ( x )) / 2 , 1 )
+            for i = 1 : 2 : length ( x )
+               {
+                 data [ (3 * i - 1) / 2 + 1 ] = x [ i ]
+                 data [ (3 * i - 1) / 2 + 2 ] = y [ i ]
+                 data [ (3 * i - 1) / 2 + 3 ] = y [ i + 1 ]
+               }
+            endfor
+          }
+          else
+          {
+            fprintf ( 'puncturing mode %g not implemented.
+' , PUNCTURING_MODE )
+            return
+          }
+        endif
+      endif
+    }
+end
+function [ data_channel_out ] = channel_model ( data_channel_in )
+    {
+      fprintf ( '  channel_model (%d)
+' , length ( data_channel_in ) )
+      data_channel_out = data_channel_in
+    }
+end
+function [ data_out ] = dvbt_receive ( data_channel_out )
+    {
+      fprintf ( '  dvbt_receive (%d)
+' , length ( data_channel_out ) )
+      global PACKETS_PER_PRBS_PERIOD
+      global dvbt_receive_current_packet
+      global dvbt_receive_prbs_register
+      global dvbt_receive_conv_regigster
+      dvbt_receive_current_packet = 0
+      data = data_channel_out
+      [ x , y ] = depuncturing ( data )
+      data = convolutional_decode ( x , y )
+      data = byte_from_bit_vector ( data )
+      data = outer_deinterleave ( data )
+      data = rs_decode ( data )
+      data = remove_sync_and_unscramble ( data )
+      data_out = data
+      dvbt_receive_current_packet = rem ( dvbt_receive_current_packet + 1 , PACKETS_PER_PRBS_PERIOD )
+    }
+end
+function [ x , y ] = depuncturing ( data )
+    {
+      fprintf ( '    depuncturing (%d)
+' , length ( data ) )
+      global PUNCTURING_MODE
+      if PUNCTURING_MODE == 0.5
+        then
+        {
+          x = zeros ( length ( data ) / 2 , 1 )
+          y = zeros ( length ( data ) / 2 , 1 )
+          for i = 1 : 1 : length ( x )
+             {
+               x [ i ] = data [ (2 * i - 1) + 1 ]
+               y [ i ] = data [ (2 * i - 1) + 2 ]
+             }
+          endfor
+        }
+        else
+        if PUNCTURING_MODE == 0.66666668653488159
+          then
+          {
+            x = zeros ( (2 * length ( data )) / 3 , 1 )
+            y = zeros ( (2 * length ( data )) / 3 , 1 )
+            for i = 1 : 2 : length ( x )
+               {
+                 x [ i + 0 ] = data [ (3 * i - 1) / 2 + 1 ]
+                 x [ i + 1 ] = 0.5
+                 y [ i + 0 ] = data [ (3 * i - 1) / 2 + 2 ]
+                 y [ i + 1 ] = data [ (3 * i - 1) / 2 + 3 ]
+               }
+            endfor
+          }
+          else
+          {
+            fprintf ( 'puncturing mode %g not implemented.
+' , PUNCTURING_MODE )
+            return
+          }
+        endif
+      endif
+    }
+end
+function [ data ] = convolutional_decode ( x , y )
+    {
+      fprintf ( '    convolutional_decode (%d)
+' , length ( x ) )
+      global INIT_CONV_REGISTER
+      global dvbt_receive_current_packet
+      global dvbt_receive_conv_register
+      ifthen dvbt_receive_current_packet == 0
+        then
+        dvbt_receive_conv_register = INIT_CONV_REGISTER
+      endifthen
+      data = zeros ( length ( x ) , 1 )
+      for i = 1 : 1 : length ( data )
+         {
+           data_x = x [ i ]
+           for j = [ 1 2 3 6 ]
+              data_x = soft_xor ( data_x , dvbt_receive_conv_register [ j ] )
+           endfor
+           data_y = y [ i ]
+           for j = [ 2 3 5 6 ]
+              data_y = soft_xor ( data_y , dvbt_receive_conv_register [ j ] )
+           endfor
+           ifthen data_x == 0.5 & data_y == 0.5
+             then
+             fprintf ( 'warning: undefined symbol %d' , i )
+           endifthen
+           ifthen data_x < 0.5 & data_y > 0.5 | data_x > 0.5 & data_y < 0.5
+             then
+             fprintf ( 'warning: contradicting symbol %d' , i )
+           endifthen
+           if data_x < 0.5 | data_y < 0.5
+             then
+             data [ i ] = 0
+             else
+             if data_x > 0.5 | data_y > 0.5
+               then
+               data [ i ] = 1
+               else
+               fprintf ( 'error: internal error at symbol %d' , i )
+             endif
+           endif
+           dvbt_receive_conv_register = [ data [ i ] dvbt_receive_conv_register [ 2 : 1 : 6 ] ]
+         }
+      endfor
+    }
+end
+function [ x ] = soft_xor ( a , b )
+    if b < 0.5
+      then
+      x = a
+      else
+      if a == 0.5
+        then
+        x = 0.5
+        else
+        ifthen b > 0.5
+          then
+          x = 1 - a
+        endifthen
+      endif
+    endif
+end
+function [ data_out ] = byte_from_bit_vector ( data_in )
+    {
+      fprintf ( '    byte_from_bit_vector (%d)
+' , length ( data_in ) )
+      data_out = zeros ( length ( data_in ) / 8 , 1 )
+      for i = 1 : 1 : length ( data_out )
+         {
+           data_byte = 0
+           for j = 1 : 1 : 8
+              {
+                if data_in [ (8 * i - 1) + j ] <= 0.5
+                  then
+                  data_bit = 0
+                  else
+                  data_bit = 1
+                endif
+                data_byte = (2 * data_byte) + data_bit
+              }
+           endfor
+           data_out [ i ] = data_byte
+         }
+      endfor
+    }
+end
+function [ data_out ] = outer_deinterleave ( data_in )
+    {
+      fprintf ( '    outer_deinterleave (%d)
+' , length ( data_in ) )
+      global PACKET_LENGTH
+      global RS_PARITY_BYTES
+      global OI_I
+      global OI_M
+      data = reshape ( data_in , OI_M , OI_I )
+      data_out = reshape ( .' ( data ) , PACKET_LENGTH + RS_PARITY_BYTES , 1 )
+    }
+end
+function [ data_out ] = rs_decode ( data_in )
+    {
+      fprintf ( '    rs_decode (%d)
+' , length ( data_in ) )
+      global PACKET_LENGTH
+      global RS_PARITY_BYTES
+      ifthen length ( data_in ) ~= PACKET_LENGTH + RS_PARITY_BYTES
+        then
+        {
+          fprintf ( 'error: rs_decode: packet size %d is not expected %d.
+' , length ( data_in ) , PACKET_LENGTH + RS_PARITY_BYTES )
+          return
+        }
+      endifthen
+      ifthen data_in [ PACKET_LENGTH + 1 : 1 : PACKET_LENGTH + RS_PARITY_BYTES ] ~= zeros ( RS_PARITY_BYTES , 1 )
+        then
+        fprintf ( 'error: parity
+' )
+      endifthen
+      data_out = data_in [ 1 : 1 : PACKET_LENGTH ]
+    }
+end
+function [ data_out ] = remove_sync_and_unscramble ( data_in )
+    {
+      fprintf ( '    remove_sync_and_unscramble (%d)
+' , length ( data_in ) )
+      global PACKET_LENGTH
+      global NET_PACKET_LENGTH
+      global PACKETS_PER_PRBS_PERIOD
+      global SYNC_BYTE_VALUE
+      global INV_SYNC_BYTE_VALUE
+      global INIT_PRBS_REGISTER
+      global dvbt_receive_current_packet
+      global dvbt_receive_prbs_register
+      if dvbt_receive_current_packet == 0
+        then
+        {
+          dvbt_receive_prbs_register = INIT_PRBS_REGISTER
+          sync_byte = INV_SYNC_BYTE_VALUE
+        }
+        else
+        {
+          dvbt_receive_current_packet [ 1 ]
+          sync_byte = SYNC_BYTE_VALUE
+        }
+      endif
+      ifthen sync_byte ~= data_in [ 1 ]
+        then
+        {
+          fprintf ( 'warning: actual sync byte (%2.2x) does not match
+' , data_in [ 1 ] )
+          fprintf ( 'warning: expected sync byte (%2.2x).
+' , sync_byte )
+          fprintf ( 'warning: (current_packet=%d)
+' , dvbt_receive_current_packet )
+        }
+      endifthen
+      [ prbs , dvbt_receive_prbs_register ] = prbs_sequence ( NET_PACKET_LENGTH , dvbt_receive_prbs_register )
+      data_out = byte_xor ( data_in [ 2 : 1 : PACKET_LENGTH ] , prbs )
+    }
+end
+MainProg
+ {
+   global_settings ( )
+   global NET_PACKET_LENGTH
+   input_file = fopen ( [ getenv ( 'MOUSE_TOP' ) '/app/dvbt/demo_head.mpg' ] , 'r' )
+   while ~ ( feof ( input_file ) )
+      {
+        data_in = 1
+        [ data_in , count ] = fread ( input_file , NET_PACKET_LENGTH )
+        disp ( data_in )
+        ifthen count ~= 0
+          then
+          {
+            fprintf ( 'reading block of length %d
+' , count )
+            ifthen count < NET_PACKET_LENGTH
+              then
+              data_in = [ data_in ; zeros ( NET_PACKET_LENGTH - count , 1 ) ]
+            endifthen
+            data_channel_in = dvbt_send ( data_in )
+            data_channel_out = channel_model ( data_channel_in )
+            data_out = dvbt_receive ( data_channel_out )
+            if data_in == data_out
+              then
+              fprintf ( 'send&receive of %d bytes successful
+' , length ( data_in ) )
+              else
+              {
+                fprintf ( '**error**
+' )
+                return
+              }
+            endif
+            fprintf ( '
+' )
+          }
+        endifthen
+      }
+   endwhile
+   fclose ( input_file )
+ }
+endMainProg

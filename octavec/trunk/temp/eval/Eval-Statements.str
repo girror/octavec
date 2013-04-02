@@ -1,0 +1,24 @@
+module Eval-Statements
+imports ElimRules
+rules
+
+ EvalIf :
+  If(Matrix(ms), e1, e2) -> e1
+   where <is-const> Matrix(ms); <map(map(is-true))>ms 
+
+ EvalIf :
+  If(Matrix(ms), e1, e2) -> e2
+   where <is-const> Matrix(ms); <oncetd(is-false)>ms
+
+
+ EvalIfThen :
+  IfThen(Matrix(ms), e1) -> e1
+   where <is-const> Matrix(ms)
+	 ;<map(map(is-true))>ms
+
+ EvalIfThen :
+  IfThen(Matrix(ms), e1) -> Stats([])
+   where <is-const> Matrix(ms)
+	 ;<oncetd(is-false)>ms
+
+

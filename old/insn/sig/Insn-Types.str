@@ -1,0 +1,7 @@
+module Insn-Types
+signature
+  constructors
+    INT    : IType
+    FLOAT  : IType
+    STRING : IType
+    WORD   : IType

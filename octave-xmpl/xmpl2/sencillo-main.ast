@@ -1,0 +1,1 @@
+Program([FunDec(VarDef("sencillo_tb"),[],[],Stats([Assign(Var("a"),"=",Int(5)),Assign(Var("b"),"=",DataOp("+",[DataOp("+",[Var("a"),Int(5)]),Int(2)]))]))])

@@ -1,0 +1,65 @@
+module TC-Calls
+
+rules
+  
+ // For typechecking intrinsic functions 
+  TcFunc:
+   |[ f() ]| -> |[ f() :: ts ]|
+  where  type-library-call => ts
+
+			
+  TcFunc:
+   |[ f(a*) ]| -> |[ f(a1*) :: ts ]|
+  where type-call-args => (a1*,ts)
+
+
+  /**
+   * Mapping functions
+   */
+  TcMapFunc:  
+   |[ f(e::ts)]| -> |[ f(e::ts):: matrix(t1,dim(sh*)) ]| 
+  where <MappingCall> Call(Var(f),[SCALAR(<GetAType>ts) ]) => ts1
+      ; if <not(SCALAR(id))>ts then
+	  <GetShape> ts => sh* ; <GetAType>ts1 => t1 ; !|[ matrix(t1,dim(sh*)) ]|
+	else
+	  !ts1 
+	end => ts2
+
+  /**
+   * User functions
+   */
+  TcExpCall(s):
+   |[ f(a*) ]| ->  |[ g(a*) :: ts ]|
+  where  <map(extract-typeshape)> a* => arg-tyshes
+	; <RetrieveSpecialization
+		<+ SpecializeCall(s)> Call(Var(f),arg-tyshes) => (g,ts)
+
+
+strategies
+ 
+  type-call-args =  
+   ?|[ f(a*) ]| 
+   ; <map(extract-typeshape)> a* => a1*
+   ; <type-library-call> |[f(a1*)]|
+   ; !(a*,<id>)
+
+  type-library-call = 
+     (MappingCall <+ LibCall <+ LibLastTypeCall) 
+   ; (?[<id>] <+ id)
+
+
+  /**
+   * Asumme that this is the last
+   * rule to type a intrinsic function
+   * It requires to check that
+   * f is in fact a intrinsic function
+   */
+  LibLastTypeCall:
+   Call(Var(f), aa) ->  out-args
+   where <is-library-func>f
+	 ; (NumArgsOut <+ !1)
+	 ; upto
+	 ; map(!UNIVERSAL) 
+	 ; Hd
+	 ; try(?[<id>]) => out-args 
+	 ; where(!f; if-verbose1(debug(!"Library default for function: ")))

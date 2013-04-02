@@ -1,0 +1,100 @@
+module TC-CommonLib
+
+rules
+
+  
+
+
+
+// More functions
+
+
+ //shape and type preserving
+ TcBFunc:
+  |[ f(e::ts) ]| ->  |[ f(e::ts):: ts ]|
+  where <?"cumsum" + ?"cumprod">f
+	; <GetAType>ts
+	;  not(?|[char]|)
+
+ // reducing shape of matrix
+ TcBFunc:
+  |[ f(e::ts, e1::int) ]| -> |[ f(e::ts, e1::int)::matrix(t,dim(sh*)) ]|
+  where  <?"sum" + ?"sumsq" + ?"prod">f
+	; <GetAType>ts => t
+	; not(?|[char]|)
+	; <GetShape>ts => [r,c]
+	; ![Int("1"),r] =>sh*
+
+
+  //max, min:: matrix -> one or two results
+ TcBFunc:
+  |[ f(e::ts) ]| ->  |[ f(e::ts):: ts2 ]|
+  where <?"max" + ?"min">f
+	;<GetAType>ts => t
+	; <GetShape>ts => [r,c]
+	; ![MATRIX(t,[Int("1"),r]), MATRIX(INT,[Int("1"),r])]
+	; <NumArgsOut <+ !1 >()
+	; (?2;![MATRIX(t,[Int("1"),r]), MATRIX(INT,[Int("1"),r])]
+	   <+ !MATRIX(t,[Int("1"),r])) => ts2
+
+
+  //max,min ::  scalar * matrix -> matrix
+ TcBFunc:
+  |[ f(e::ts, e1::ts1) ]| ->  |[ f(e::ts,e1::ts1):: ts2 ]|
+  where <?"max" + ?"min">f
+	;  <get-scalar>ts =>t
+	; <matrix-scalar>(ts1,ts) =>ts2
+
+  //max,min ::  scalar * matrix -> matrix
+ TcBFunc:
+  |[ f(e::ts, e1::ts1) ]| ->  |[ f(e::ts,e1::ts1):: ts2 ]|
+  where <?"max" + ?"min">f
+	; <get-scalar>ts1 =>t
+	; <matrix-scalar>(ts,ts1) =>ts2
+
+  //max,min ::  matrix * matrix -> matrix
+  TcBFunc:
+   |[ f(e :: ts, e1:: ts1)]| -> |[ f(e :: ts, e1:: ts1):: ts2 ]|
+   where <?"max" + ?"min">f
+	;<matrix-matrix <+ scalar-scalar> (ts, ts1) => ts2
+
+
+  TcBFunc:
+   |[ find(e :: ts)]| -> |[ find(e :: ts):: ts2 ]|
+  where <NumArgsOut <+ !1 >() =>tt
+	; <GetAType>ts =>t
+	; ![SKIP,SKIP] => sh*
+	; ![MATRIX(INT,sh*),MATRIX(INT,sh*),MATRIX(t,sh*)]
+	; take(!tt)
+	; try(?[<id>]) => ts2
+
+ TcBFunc:
+  |[ reshape(e::ts,e1::ts1,e2::ts2) ]| ->  |[ reshape(e::ts,e1::ts1,e2::ts2)::ts3]|
+  where !ts => MATRIX(t,ds) 
+        ;!e1 => Int(aa)
+        ;!e2 => Int(bb)
+	; <prod>ds => size
+	; <mulS>(aa,bb) => size
+	; !MATRIX(t,[e1,e2]) => ts3
+
+
+ TcBFunc:
+  |[ size(e::ts) ]| -> |[ size(e::ts)::matrix(t,dim(sh*)) ]|
+ where !ts => MATRIX(t,ds)
+	; <not(oncetd(?SKIP()))>ds
+	; ![Int("1"),Int(<length; int-to-string>ds)] => sh*
+
+
+/* TcBFunc:
+  |[ size(e::ts) ]| -> Matrix([ds']){ |[ matrix(t,sh1)]| }
+ where !ts => MATRIX(t,ds)
+	; <not(oncetd(?SKIP()))>ds
+	; ![Int("1"),Int(<length; int-to-string>ds)] => sh1*/
+
+
+ strategies
+
+ scalar-scalar =
+  (get-scalar, get-scalar)
+  ; get-wide-scalar
+  ;!SCALAR(<id>)

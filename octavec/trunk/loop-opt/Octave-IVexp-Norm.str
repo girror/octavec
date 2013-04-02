@@ -1,0 +1,41 @@
+module Octave-IVexp-Norm 
+imports liblib 
+strategies 
+
+  normalize-exp = 
+    bottomup(try(Normalize))
+
+rules
+
+// Positive
+
+  Normalize :
+    |[ x = ((x * e) + e1) ]| -> |[ x = ((e * x) + e1) ]|
+  
+  Normalize :
+    |[ x = ((x * e) - e1) ]| -> |[ x = ((e * x) - e1) ]|     
+
+  Normalize :
+    |[ x = (x + e1) ]| -> |[ x = ((1 * x) + e1) ]|
+
+  Normalize :
+    |[ x = (x - e1) ]| -> |[ x = ((1 * x) - e1) ]|    
+
+// Negative
+
+  Normalize :
+    |[ x = ((0 - (x * e)) + e1) ]| -> |[ x = ((0 - (e * x)) + e1) ]| 
+  
+  Normalize :
+    |[ x = ((0 - (x * e)) - e1) ]| -> |[ x = ((0 - (e * x)) - e1) ]|     
+
+  Normalize :
+    |[ x = ((0 - x) + e1) ]| -> |[ x = ((0 - (1 * x)) + e1) ]|
+
+  Normalize :
+    |[ x = ((0 - x) - e1) ]| -> |[ x = ((0 - (1 * x)) - e1) ]|
+    
+// Other
+
+  Normalize :
+    |[ x = x ]| -> |[ nil ]|       

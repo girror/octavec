@@ -1,0 +1,287 @@
+module Record-Lib
+imports liblib
+strategies
+
+ /**
+  * This strategy traverses a record structure 
+  * using a path to traverse it
+  * The result is: the non consume path and the
+  * correspontent subtree 
+  * @type:: List(String) * Term -> List(String) * Term)
+  */
+
+ path-traverse-rose-tree(|constr) =
+    (TravTree(|constr) <+ TravTreeDef)
+
+
+ TravTreeDef:
+  ([],tree) -> ([],tree)
+
+ TravTree(|constr):
+  ([p|path], tree) -> ([p|path],())
+  where <not(get-tree(|constr))> (p, tree)
+
+ TravTree(|constr):
+  ([p|path], tree) -> <path-traverse-rose-tree(|constr)> (path, tree')
+  where <get-tree(|constr)>(p, tree) => tree' 
+
+
+ get-tree(|constr) =  GetTreeDef <+ GetTree(|constr) 
+
+ GetTreeDef: (f,(f,t)) -> t
+
+ GetTree(|constr):
+  (f, tree) -> <fetch-elem(?"VarTyped"#([f,<id>]))> rs
+  where !tree;?constr#([rs])
+
+
+  /**
+   * Traverses the structure following a path
+   */
+  get-rose-element(|constr) =
+    ?(record, fieldvar) 
+   ;<try(GetPath)> fieldvar => path 
+   ;<path-traverse-rose-tree(|constr)>(path,record) 
+   ;?(_,<id>)
+
+
+rules
+
+
+ /**
+  * Get the insertion point of in a record 
+  * of a fieldvar, by splitting the path defined in the FieldVar
+  *
+  * @type:: FieldVar:Exp * Record:Exp-> List(String) * List(String)
+  */
+ get-insert-point(|constr) =
+     (try(GetPath),id)
+   ; ?(path,_)
+   ; path-traverse-rose-tree(|constr) => (p,rr)
+   ; <get-insert-path> (path, p)
+   ; !(<id>, p)
+
+ 
+ /**
+  * Get the insertion path of a
+  * record field, non considering the record's root
+  * @type:: Exp:FielVar -> List(String)
+  */
+  GetPath = 
+     ? FieldVar(_,n) ; ![n]
+ //    ; collect-set-annos(is-string)
+ //    ; Tl
+
+ /**
+  * Get the prefix of insertion path  by skipping
+  * the elements in the second list
+  * @type:: List(String) * List(String -> List(String)
+  */
+ get-insert-path=
+ {path, l:
+  (  ?(path,_) 
+    ; (length, length) 
+    ; subt =>l
+    ; <take(!l)> path
+  )
+ }
+
+
+ /**
+  * Inserts a typed element of a record into the Type record structure
+  * @type:: RoseTree:Exp * FieldVar:Exp * Exp -> Record:Exp
+  */
+ insert-elem-in-record(father-term|constr, v) =
+ {path, p, p',stree,i-path, e, record, fieldvar:
+   ?(path, record)  
+  ; get-insert-point(|constr) => (i-path, p)
+    ;(   <InsertDestructive(father-term | constr, v, record)>(i-path, p)
+     <+  <Insert(|constr, v, record)>(i-path, p) 
+     )
+ }
+
+
+rules
+
+
+ InsertDestructive(father-term|constr, v, record):
+  (i-path,[e]) -> res
+  where <path-traverse-rose-tree(|constr)>(i-path, record)
+      ; (?[], father-term)
+      //; debug(!"destructive?? ")
+      ; <!(<init>, <last>)> i-path => (father-path, f)
+      ; <create-record-path(|constr)>([e],v) => val
+      ; <insert-destructive-in-rose-tree(|val)>(i-path, record) => res
+
+
+
+ Insert(|constr,v, record):
+  (i-path, [p|ps]) -> res
+ where //debug(!" in insert:  ");
+       <create-record-path(|constr)>(ps, v) => stree   
+      //; debug(!" in insert record :  ")
+      ; <insert-in-rose-tree(|constr, (p, stree))>(i-path, record) =>res
+      //; debug(!"outcome: ")
+
+
+
+ /**
+  * This strategy traverses a record structure
+  * using a path to traverse it
+  * The result is: the non consume path and the
+  * correspontent subtree 
+  * @type:: List(String) * Term -> List(String) * Term)
+  */
+
+ insert-in-rose-tree(|constr,val) =
+    {| GetField: 
+          ?(ipath, record)
+        ; new => x
+        ; rules(GetField: () -> ipath)
+        ; <topdown(try(	
+		   insert-tree3(|constr,val)
+		<+ insert-tree2(|constr,val)  
+		<+ insert-tree1
+	 ))> record
+
+    |}
+
+
+ insert-tree2(|constr, val) =
+  {tuple,f,rs:
+  ?tuple
+  ;where(
+      <GetField> () 
+     ; ?[f]
+     ; <eq>(f,<Fst>tuple)
+    ) 
+  ; <Snd> tuple  ; ?constr#([rs])
+  ; <at-end(![val])> rs 
+  ; <mkterm>(constr,[<id>]) 
+  ; where(rules(GetField :- () ))
+  ; !(f,<id>)
+  }
+ 
+
+ insert-tree3(|constr, val) =
+ { as:
+   where( <GetField> (); ?[] )
+   ; ?constr#([as])
+   ; <at-end(![val])> as
+   ; <mkterm>(constr,[<id>])
+   ; where(rules(GetField :- ()) )
+ }
+
+
+insert-tree1 =
+ {input,res,fields: 
+  ?input
+  ;where(<GetField> () => res	
+	; not(?[_])
+        ; <Hd> res 
+	; <eq> (<Fst>input, <id>)
+        ; <Tl> res => fields
+        ; rules(GetField: () -> fields)
+  )}
+
+
+
+ create-record(|constr) =
+    (try(GetPath),id)
+  ; build-record(|constr)
+
+
+ /**
+  * Creates a branch tree
+  * It takes a reverse path list as an input
+  * @type:: List(String) * [] -> Record:Ty
+  */
+ create-record-path(|constr)  =
+    build-record(|constr)
+
+  build-record(|constr) =
+   ?(fs,val)
+  ; <foldr(!val, \ (f,v) -> <mkterm>(constr,[[(f,v)]]) \ )>fs
+
+
+
+rules
+
+  ReplaceTreeprefer(|val):
+  (f, term)  -> (f, val)
+  where  <GetField> () => [f]
+	; rules(GetField :- () )
+	
+  ReplaceTree(|val):
+  (f, record) -> (f, record)
+  where   <GetField> () => [f| fields]
+        ; <not(?[])> fields
+        ; rules(GetField: () -> fields)
+
+
+  replace-in-rose-tree(|val) =
+      (try(GetPath), id) 
+     ; insert-destructive-in-rose-tree(|val)
+
+
+  insert-destructive-in-rose-tree(|val) =
+   {| GetField:
+      ?(ipath, record)
+    ; rules(GetField: () -> ipath)
+    ; <topdown(try( ReplaceTreeprefer(|val) <+  ReplaceTree(|val)))> record
+   |}
+
+// DELETE
+
+ delete-in-rose-tree(|constr) =
+   {| GetField:
+       ?(ipath, record)
+    ; rules(GetField: () -> ipath)
+    ; <sometd(DeleteTreeprefer(|constr) <+ DeleteTree(|constr))> record
+   |}
+
+rules
+
+
+ DeleteTreeprefer(|constr):
+  (f, term)  -> (f, term')
+  where  <GetField> () => [f]
+	; !term;?constr#([rs])
+	; <filter(?(f,_))> rs => rs'
+	; rules(GetField :- () )
+        ; !constr#([rs']) =>term'
+
+
+ DeleteTreeprefer(|constr):
+   term  -> term'
+  where <GetField> () => []
+	; !term;?constr#([rs])
+	; <filter(?(f,_))> rs => rs'
+	; rules(GetField :- () )
+        ; !constr#([rs']) => term'
+
+ DeleteTree(|val):
+  (f, record) -> (f, record)
+  where <GetField> () => [f| fields]
+        ; <not(?[])> fields
+        ; rules(GetField: () -> fields)
+
+
+
+
+
+
+
+/* --------- instantiation
+
+  insert-val-in-record(|constr, val) =
+       (try(GetPath), id)
+     ; insert-elem-in-record(avoid-terms|constr, val)
+
+
+  avoid-terms =
+    ?Cell([]) + ?Matrix([])
+
+  get-rose-element =
+    get-rose-element(|CONSTR)
+ */

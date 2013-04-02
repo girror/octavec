@@ -1,0 +1,16 @@
+module translate
+imports xtc-lib stratego-xt-xtc-tools 
+strategies
+ 
+  io-translate =
+    xtc-io-wrap(
+          octave-insn
+    )
+ 
+  octave-insn =
+      where(<progress-msg> "translating")
+    ; xtc-transform(!"Octave2INSN")
+
+
+  progress-msg =
+    if-verbose1(<printnl> (stderr, ["  -> ", <id>]))

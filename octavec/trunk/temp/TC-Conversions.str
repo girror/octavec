@@ -1,0 +1,171 @@
+module TC-Conversions
+imports Octave-TypeIncludes Octave-Shapes
+
+ 
+overlays
+
+  TypeS = 
+     [(NIL(),0),(BOOL(),1),(INT(),2),(FLOAT(),3),(COMPLEX(),4)]
+
+strategies
+ 
+ get-char =
+  ?(CHAR, CHAR); Fst
+
+  /** 
+   * Gets a type scalar from a TypeShape term
+   **/
+  get-scalar =
+    where(GetShape; ?[Int("1"),Int("1")])
+    ; GetAType
+
+  has-scalar-shape =
+    where(?[<id>];get-scalar <+ ?[Int("1"),Int("1")])
+
+
+  swap =
+   !(<Snd>,<Fst>)
+
+  is-scalar = 
+  <lookup> (<id>, TypeS)
+
+  is-numeric =
+    is-scalar => n
+   ; <gt>(n,0)
+
+  
+  simple-type = 
+     where(?SCALAR(<id>) + ?MATRIX(<id>,_) + ?RANGE(<id>,_)) 
+
+
+  /** All typing is done taking the root variable and
+   *  traversing the type data structure, if it is 
+   *  complex type (such as a record)
+   */
+  get-root-var =
+    collect(?Var(_)); Hd
+
+  get-type =
+    {e,ts: ?|[ e::ts ]|; <GetAType> |[ ts ]|}
+
+  get-type-esp =
+      get-annos
+    ; (GetAType <+ ?[<GetAType>])
+
+  get-matrix-type = 
+   ?MATRIX(<id>,_) <+ ?RANGE(<id>,_)
+
+
+  get-wide-scalar = 
+   (try(get-scalar), try(get-scalar) )
+  ; ?tuple
+  ;( is-narrow-type ; <Snd>tuple <+ <Fst>tuple)
+
+ 
+  is-narrow-type =
+   (is-scalar, is-scalar); lt   
+
+
+  getListType(get-type|t) = 
+    foldr(!t,(get-type; try(get-matrix-type) , id)
+	; (get-wide-scalar <+ get-char))
+
+
+  get-wide-shape =
+    ?(sh1, sh2)
+    ; (length, length); max => dimensions
+    ; <expand(|dimensions)> sh1 => sh1'
+    ; <expand(|dimensions)> sh2 => sh2'
+    ; <zip(set-maximum)>(sh1,sh2)
+    
+    
+  expand(|dim) =
+    ?shape
+    ; length
+    ; <subt>(dim,<id>)
+    ; upto
+    ; map(!Int("1"))
+    ; <conc>(shape,<Tl>)
+
+
+  set-maximum =
+   (?Int(<string-to-int>), ?Int(<string-to-int>))
+   ; max
+   ; !Int(<int-to-string>)
+
+
+  getMatrixType(|t) =
+    getListType(get-type-esp|t)
+
+
+  extract-typeshape =
+  {e,ts:
+     ?|[ e::ts ]|
+   ; <GetTypeShape>ts
+  } <+ !UNIVERSAL
+
+  extract-shape =
+  {e,ts:
+     ?|[ e::ts ]|
+    ; <GetShape>ts
+  }
+
+  GetDims =
+    GetShape
+   ;length
+ 
+  GetAType =
+     try(remove-list-from-shapes) 
+   ; GetSingleType
+
+  GetTypeShape = 
+    try(remove-list-from-shapes)
+  ; try({t,d: ?RANGE(t,d);!MATRIX(t,d)})
+
+
+  GetShape =
+    GetTypeShape
+  ; (get-matrix-shape <+ get-scalar-shape)
+
+
+  get-matrix-shape = ?MATRIX(_,<id>) <+ ?RANGE(_,<id>)
+  get-scalar-shape = ?SCALAR(_); ![Int("1"),Int("1")]
+
+
+
+
+
+
+
+rules
+
+
+ GetSingleType: 
+  SCALAR(t)-> t
+
+ GetSingleType: 
+  MATRIX(t,_) -> t
+
+ GetSingleType: 
+  RANGE(t,_) -> t
+
+
+
+ remove-list-from-shapes =
+     ?ts;
+   if [is-shape]
+   then ?[<id>]
+   else  <[map(is-shape)]>ts
+	; ?[<id>]
+   end
+  
+
+
+
+ is-shape =
+  ?SCALAR(_) + ?MATRIX(_,_) + ?RECORD(_) + ?CELL(_)
+ 
+
+  is-matrix-type = where(?MATRIX(_,_))
+  is-scalar-type = where(?SCALAR(<is-scalar>))	
+ 

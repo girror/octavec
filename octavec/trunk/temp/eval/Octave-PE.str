@@ -1,0 +1,106 @@
+/**
+ * Octave partial evaluator.
+ */
+module Octave-PE
+imports 
+  octave/lang/forward-propagation
+  Octave-SuperOpt
+  liblib 
+  stratego-xt-xtc-tools 
+  octave/xtc
+
+strategies
+    
+  io-Octave-PE = 
+   octave-io-wrap(Octave-PE) 
+
+  Octave-PE =
+    Prog(map(generate-specialization-rule( |["PropConst","CopyProp","CSE"] )),id)
+  ; Prog(id,partial-eval)
+  ; Prog(<concat>[<id>,<bagof-specialized-functions>],id)
+
+
+  partial-eval =
+    forward-prop(
+        prop-const-transform(partial-eval) 
+      + ?|[ f(a*) ]|
+      ; if <not(is-being-specialized)>f then 
+          specialize-call(specialize-function-by-value,specialization-facts-by-value | <get-nargout>) 
+        end
+      , super-opt-before(partial-eval)
+      , partial-eval
+      , super-opt-after
+      | ["PropConst","CopyProp","CSE"], [], []
+    )
+
+  is-being-specialized =
+    ?f ; bigbagof-specializing => [_|_]
+
+  specialize-function-by-value(|facts,nargout,scopes) :
+    fcn@Function(result,f,args,body) -> Function(result,g,new_args,new_body)
+      where
+        dr-ignore-rules-state(
+          where(get-var-names; map({x:?x; new-dynamic-rules(|scopes, x, x) }))
+        ; alter-name-by-value(|f,facts) => g 
+        ; rules( specializing :+ f -> g ) 
+        ; <diff>(args,<map(Fst)>facts) => new_args
+        ; <generate-prop-const-rules>facts => a*
+        ; <partial-eval>body => new_body
+        | ["specializing"|scopes] )
+
+  generate-prop-const-rules =
+    map(\ (|[ x ]|,e) -> |[ x = e ]| \ ; prop-const-assign)
+
+  specialization-facts-by-value(|args) =
+    <zip>(args,<id>)
+  ; !(<filter((id,not(is-value));Snd)>,<filter((id,is-value))>)
+    
+  alter-name-by-value(|f,facts) =
+    <concat-strings>[f,"__",<new>]
+
+  generate-specialization-rule( | scopes) =
+    ?fcn@Function(result,f,args,body)
+  ; where( not( <get-config> "--avoid" ; fetch-elem(?f) ) ) 
+  ; rules(
+      specialize-call(specialize-function: a * a * a * a -> a,specialization-facts: a * a -> a | nargout) :
+        |[ f(a*) ]| -> e
+          where 
+            <specialization-facts(|args)>a* => (a1*,facts) 
+          ; ( <specialized-function>(f,nargout,facts)=> spec_fcn@Function(new_result,g,_,e1)
+           <+ <specialize-function(|facts,nargout, scopes)>fcn => spec_fcn@Function(new_result,g,_,e1)
+            ; rules( specialized-function  :+ (f,nargout,facts) -> spec_fcn )
+            ) 
+          ; if is-inlineable then 
+              rename-vars => Function(res,g,_,<id>)
+            else
+              rules( specialized-functions :+ _ -> spec_fcn )
+            ; !|[ g(a1*) ]|
+            end => e
+         <+ <fatal-error> ["Specialization failed for function ",f,"."]
+    ) 
+
+  is-inlineable = 
+  // no eval/feval etc.
+    Function([],id,[],id)
+  ; not(
+      oncetd(
+        Global(id)
+      + GlobalInit(id,id)
+      + Call(Var("eval"+"feval"),id)
+      + Return
+      )
+    )
+
+  rename-vars = 
+  {| RenameVar : 
+     let skip-me(s) = Call(id,s)
+         vars = 
+           collect(Var(id)) 
+         ; map({ ?Var(v) ; new => v1 ; rules( RenameVar : Var(v) -> Var(v1) ) }) 
+     in 
+       where(vars)
+     ; topdownS(try(RenameVar),skip-me)
+     end
+  |}
+
+  get-nargout = nargout <+ !1

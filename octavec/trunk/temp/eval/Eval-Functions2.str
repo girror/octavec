@@ -1,0 +1,63 @@
+module Eval-Functions2
+rules
+
+/**
+ * This file contains rules for partial evaluation
+ */
+
+ EvalRelOp : 
+ |[ e1 == e ]| -> <try(EvalFun)> |[ ones(1,k )]|
+  where  <?String(<id>)> e1 => chars1
+	; <?String(<id>)> e 
+	; <zip(eq)>(chars1,<id>)
+	; <length;int-to-string> chars1 => k
+
+ EvalFun:
+ |[ length(e) ]| -> |[ k ]|
+  where <?Matrix(<id>); matrix-size> |[ e ]| => (r,c)
+	; <gt; !r <+ !c> (r,c) => k
+
+ EvalFun:
+ |[ size(e, 1) ]| -> |[ k ]|
+  where <?Matrix(<id>); matrix-size> |[ e ]| => (k, c)
+
+
+ EvalFun:
+ |[ size(e, 2) ]| -> |[ k ]|
+ where <?Matrix(<id>); matrix-size> |[ e ]| => (r, k)
+
+ EvalFun:
+ |[ size(e) ]| -> Matrix([[ |[ i ]|, |[ j ]|  ]]) 
+ where <?Matrix(<id>); matrix-size> |[ e ]| => (i, j)
+
+ EvalFun:
+ |[ zeros(i,j) ]| -> Matrix(rrs)
+ where <mulS; under-matrix-limit> (i,j)
+       ;<string-to-int; dec; create-row-zeros> j => rs
+       ;<replicate-row>(i,rs) => rrs
+
+ EvalFun:
+ |[ zeros(i) ]| -> Matrix(rrs)
+ where <under-matrix-limit> i
+	 ;<string-to-int; dec; create-row-zeros> i => rs
+	 ;<replicate-row>(i, rs) =>rrs
+
+ EvalFun:
+ |[ ones(i,j) ]| -> Matrix(rrs)
+  where <mulS; under-matrix-limit> (i,j)
+	;<string-to-int; dec; create-row-ones> j => rs
+	;<replicate-row>(i,rs) => rrs
+
+ EvalFun:
+ |[ ones(i) ]| -> Matrix(rrs) 
+  where <under-matrix-limit> i
+	;<string-to-int; dec; create-row-ones> i => rs
+	;<replicate-row>(i, rs) =>rrs
+
+ EvalFun:
+ |[ isstruct(e) ]| -> |[ false ]| 
+  where <not-struct-exp> e
+
+
+
+

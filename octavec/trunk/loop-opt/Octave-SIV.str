@@ -1,0 +1,153 @@
+module Octave-SIV
+imports 
+  liblib 
+  liboctavec 
+  Octave-New-Norm
+  Octave-MIV
+  Octave-Vectorize-Statement 
+
+signature
+  constructors
+    DEPENDENCE       : Constraint
+    NO-DEP           : Constraint
+    SIV              : Constraint
+    
+strategies    
+
+  classify-siv =
+    ? (index,index2)
+    ; get-vars => [iv] 
+    ; !(SIV, iv)
+    
+  SIV-test(| uid1,uid2, iv) =
+    ? (subs1, subs2)
+    ; <UpperBound> iv => ub
+    ; <try(norm)> subs1 => norm1
+    ; <try(norm)> subs2 => norm2
+    ; <check-linearity>(norm1,norm2) 
+    ; if not (? WRONG-INPUT)
+      then <try-range(| ub, iv)>(subs1, subs2)
+        <+ <strong-siv(| ub, iv, uid1,uid2)> (norm1, norm2)
+        <+ <weak-zero-siv(| ub, iv)> (norm1, norm2)
+        <+ <weak-zero-siv(| ub, iv)> (norm2, norm1)
+        <+ <complex-siv(| ub, iv)> (subs1, subs2)
+        <+ !NO-DEP
+      end
+    
+  try-range(| ub,iv) =
+    ? (a,b)
+    ; if <get-range> b => (c,stride)
+      then <get-info-itest(| ub,iv,c, stride)> a
+      else <get-range> a => (c,stride)
+         ; <get-info-itest(| ub,iv,c, stride)> b
+      end
+
+  get-info-itest(| ub,iv,b,stride) =
+    ? a 
+    ; exp-norm(| iv)
+    ; innermost(remove-minus) => norm
+    ; <get-number(| norm)> iv
+    ; ![(<id>,ub)] => coeff
+    ; <get-outcome> a => out
+    ; <map(<subt>(<id>,out))> b => c
+    ; !(coeff,c,stride)
+    ; <i-test>(coeff,c,stride)
+    
+  complex-siv(| ub, iv) = 
+    ? (e1, e2)
+    ; <get-normalized-expression(|iv); try(norm)> e1
+    ; ? |[ (i1 * x1) + i2 ]|
+    ; <get-normalized-expression(|iv); try(norm)> e2
+    ; ? |[ (i3 * x2) + i4 ]|
+    ; <subtS; string-to-int> (i4,i2 ) => out
+    ; <subtS; string-to-int>("0",i3)
+    ; ![(<string-to-int>i1,ub),(<id>,ub)]
+    ; <i-test> (<id>,[out], 1)
+    
+  strong-siv(| ub, x, uid1, uid2) :
+    ( |[ ((i * x) + j) ]|, |[ ((i * x) + k) ]|) -> dep
+    where <divint>(<subtS; try(absolute)>(j,k),i) 
+        ; string-to-int => distance
+        ; <subt>( ub, 1) => range
+        ; if <leq>(distance, range)
+          then <test-direction(|uid1, uid2)> (j,k)
+          else !NO-DEP
+          end
+          => dep          
+  
+  test-direction(|uid1, uid2) =
+    ? (j,k)
+    ; if <? uid1>uid2; <leqS>(j,k)
+      then !NO-DEP
+      else !DEPENDENCE
+      end 
+
+  weak-zero-siv(| ub, y) :
+    ( |[ ((0 * x) + j) ]|, |[ ((i2 * y) + j2) ]|) -> dep 
+    where <divint>(<subtS>(j,j2), i2) => coefficient
+           ;( (<not(ltS)> (coefficient,"1")
+              ; <string-to-int> coefficient => coeff
+              ; <leq> (coeff, ub)
+	      ; !DEPENDENCE => dep )
+           <+ !NO-DEP => dep
+           )
+	  
+  divint =
+      where(modS => "0")
+    ; divS
+
+  absolute =
+    ? input
+    ; <ltS>(input,"0")
+    ; <subtS>("0",input) 
+
+  get-range =
+    ? Range(Int(i),Int(j),Int(k))
+    ; !([i,k],j)
+    ; remove-string
+    
+rules
+
+  norm :
+    |[ x + e ]| -> |[ ((1 * x) + e) ]|
+
+  norm :
+    |[ e + x ]| -> |[ ((1 * x) + e) ]| 
+
+  norm :
+    |[ x ]| -> |[ ((1 * x) + 0) ]|  
+
+  norm :
+    |[ i ]| -> |[ ((0 * b) + i) ]|   
+
+  norm :
+    |[ i * x ]| -> |[ ((i * x) + 0) ]| 
+    
+  norm :
+    |[ (((0 - i) * x) + j) ]| -> |[ ((k * x) + j) ]|  
+    where <subtS> ("0", i) => k
+
+  de-norm :
+    |[  (1 * e) + i ]| -> |[ e + i ]|
+   
+  de-norm :
+    |[ e + 0 ]| -> |[ e ]|
+
+  de-norm :
+    |[ 1 * e ]| -> |[ e ]|
+
+  remove-minus :
+    |[ (e - (i * x)) ]| -> |[ (e + (k * x))  ]|
+    where <subtS>("0",i) => k
+
+  remove-minus :
+    |[ (0 - (i * x)) ]| -> |[ k * x ]|
+    where <subtS>("0",i) => k
+
+  remove-minus :
+    |[ e - i ]| -> |[ e + k ]|
+    where <subtS>("0",i) => k
+
+    
+    
+    

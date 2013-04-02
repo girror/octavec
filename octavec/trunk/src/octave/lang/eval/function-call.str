@@ -1,0 +1,276 @@
+module octave/lang/eval/function-call
+rules
+
+/**
+ * This file contains rules for evaluation functions
+ * It is also used in octave-tc.
+ */
+	 
+   EvalFun:
+  |[ tolower(e) ]| -> String(xs)
+  where <?String(<id>); lower-case> |[ e ]| => xs
+
+  EvalFun: 
+  |[ toupper(e) ]| -> String(xs)
+  where <?String(<id>);upper-case> |[ e ]| => xs
+
+
+  EvalFun:
+  |[ isbool(e) ]| -> |[ true ]|
+  where <True() + False()>  |[ e ]| // add relop check
+
+  EvalFun:
+  |[ ismatrix(e) ]| -> |[ true ]|
+  where <is-scalar-num + Matrix(not([]))>  |[ e ]|
+
+  EvalFun:
+  |[ ismatrix(e) ]| -> |[ false ]|
+  where <?String(_)> |[ e ]|
+
+  EvalFun:
+  |[ ischar(e) ]| ->  <EvalFun> |[ isstr(e) ]|
+
+  EvalFun:
+  |[ iscell(e) ]| -> |[ true ]|
+  where <?Cell(_)> |[ e ]|
+
+  EvalFun:
+  |[ iscell(e) ]| -> |[ false ]|
+  where <is-scalar-num + Matrix(id) + ?String(_) > |[ e ]|
+
+  EvalFun:
+  |[ isstr(e) ]| -> |[ true ]|
+  where <?String(_)> |[ e ]|
+
+  EvalFun:
+  |[ isstr(e) ]| -> |[ false ]|
+  where <?Int(_) + ?Matrix(_) + ?Range(_,_,_) + ?Cell(_)> |[ e ]|
+
+  EvalFun:
+  |[ isempty(k) ]| -> |[ false ]|
+
+  EvalFun:
+  |[ isempty(e) ]| -> |[ false ]|
+  where <?String(<id>);not([])> |[ e ]|
+
+  EvalFun:
+  |[ isempty(e) ]| -> |[ true ]|
+  where <?String([]) + ?Matrix([]) + ?Cell([])> |[ e ]|
+
+  EvalFun:
+  |[ isempty(e) ]| -> |[ false ]|
+  where <?Matrix(<id>); length; <gt>(<id>,0) > |[ e ]|
+
+  EvalFun:
+  |[ isnumeric(e) ]| -> |[ true ]|
+  where <not(oncetd(?String(_)))> |[ e ]|  
+
+  EvalFun:
+  |[ isnumeric(e) ]| -> |[ false ]|
+  where <oncetd(?String(_))> |[ e ]|  
+
+  EvalFun:
+  |[ length(e) ]| -> |[ k ]|
+  where <?String(<id>); length; int-to-string> |[ e ]| => k
+
+  EvalFun:
+  |[ length(e) ]| -> |[ 1 ]| where <is-scalar>|[ e ]|
+
+  EvalFun:
+  |[ strcmp(e, e1) ]| -> |[ 1 ]|
+   where <?String(<id>)>e =>x 
+        ; <?String(<id>)>e1 =>y
+        ; <eq> (x,y)
+        
+   EvalFun:
+  |[ strcmp(e, e1) ]| -> |[ 0 ]|
+   where <?String(<id>)>e =>x 
+        ; <?String(<id>)>e1 =>y
+        ; <not(eq)> (x,y)
+         
+  // rows
+  EvalFun:
+  |[ size(e, 1) ]| -> |[ 1 ]|
+  where  <?String(_)> |[ e ]|
+
+
+  //columns
+  EvalFun:
+  |[ size(e, 2) ]| -> |[ k ]|
+  where <?String(<id>); length; int-to-string> |[ e ]| => k
+
+
+  EvalFun:
+  |[ size(e, k) ]| -> |[ 1 ]|
+  where <is-scalar> |[ e ]|
+
+  EvalFun:
+  |[ size(e) ]| -> Matrix([[ |[ 1 ]|, |[ k ]|  ]])
+  where <?String(<id>); length; int-to-string> |[ e ]| => k
+
+  EvalFun:
+  |[ size(e) ]| ->  Matrix([[ |[ e1 ]|, |[ e1 ]|  ]])  
+  where <is-scalar> |[ e ]| ; !|[ 1 ]| => e1
+
+  EvalFun:
+  |[ size(e) ]| ->  Matrix([[ |[ e1 ]|, |[ e1 ]|  ]])  
+  where <?Matrix([[]])> |[ e ]|; !|[ 0 ]| => e1
+
+  EvalFun:
+  |[ all(e) ]| -> |[ false ]| where <is-false> e
+
+  EvalFun:
+  |[ all(e) ]| -> |[ true ]| where <is-true> e
+
+
+
+  EvalFun: 
+  |[ toascii(e) ]| -> e1
+  where <?String(<id>); explode-string> |[ e ]| => xs
+	; <map(int-to-string;!Int(<id>))>xs => a*
+	; (exp-as-scalar <+ exp-as-matrix) => e1
+
+  EvalFun: 
+  Call(Var("char"),e) -> String(str)
+  where <?Int(<id>)>e
+	;![<string-to-int>]
+	; implode-string =>str
+
+
+  EvalFun:
+  |[ zeros() ]| -> |[ 0 ]|
+ 
+  EvalFun:
+  |[ eye() ]| -> |[ 1 ]|
+
+  EvalFun:
+  |[ ones() ]| -> |[ 1 ]|
+
+  EvalFun:
+  |[ horzcat(a*) ]| -> Matrix([<(map(?Matrix([<id>]) <+ ![<not-complex-expr>]);concat)> a*])
+
+
+  EvalFun:
+  |[ horzcat(a*) ]| -> String(<map(?String(<id>)); concat> a*)
+
+  EvalFun:
+  |[ vertcat(a*) ]| -> Matrix(<map(?Matrix(<id>) <+ ![[<not-complex-expr>]]); concat> a*)
+
+  EvalFun:
+  |[ vertcat(a*) ]| -> Matrix(<map(?String(_); ![<id>])>a*)
+
+  EvalFun:
+  |[ round(k) ]| -> |[ k ]|
+
+  EvalFun:
+  |[ ceil(k) ]| -> |[ k ]|
+
+  EvalFun:
+  |[ floor(k) ]| -> |[ k ]|
+
+  EvalFun: 
+  |[ abs(k) ]| -> |[ k ]|
+
+  EvalFun:
+  |[ fix(k) ]| -> |[ k ]|
+
+  EvalFun:
+  |[ imag(k) ]| -> |[ 0 ]|
+
+
+
+  // Adding default parameteres 
+
+/*  EvalFun:
+  |[any(e)]| ->  |[ any(e,1) ]|
+
+  EvalFun:
+  |[all(e)]| ->  |[ all(e,1) ]|
+
+  EvalFun:
+  |[diag(e)]| ->  |[ diag(e,0) ]|
+
+  EvalFun:
+  |[cumsum(e)]| -> |[ cumsum(e,1) ]|
+
+  EvalFun:
+  |[cumprod(e)]| -> |[ cumprod(e,1) ]|
+
+  EvalFun:
+  |[prod(e)]| -> |[ prod(e,1) ]|
+
+  EvalFun:
+  |[sum(e)]| -> |[ sum(e,1) ]|
+
+  EvalFun:
+  |[sumsq(e)]| -> |[ sumsq(e,1) ]| */
+
+ not-complex-expr =
+  not(oncetd(?Var(_) + ?Call(_,_) + ?Subscript(_,_) + ?CellIndex(_,_)
+		    + ?Cell(_) + ?Range(_,_,_))
+    )
+
+ exp-as-scalar =
+  ?[<id>]
+
+ exp-as-matrix =
+  !Matrix([<id>])
+
+rules
+
+   EvalFun:
+    Call(Var("imag"), [Float(x)]) -> |[ 0 ]|
+
+   EvalFun:
+   |[ isnan(e) ]| -> |[ 0 ]|
+   where <is-scalar-num>  |[ e ]|
+
+   EvalFun:
+   Call(Var("isnan"), [NaN()]) -> |[ 1 ]|
+
+   EvalFun:
+   |[ floor(k) ]| -> |[ k ]| 
+
+   EvalFun:
+   |[ isreal(e) ]| -> |[ 1 ]|
+   where <is-scalar-num + Matrix(id)> |[ e ]| ;
+         <not(oncetd(?Constant("i")))> |[ e ]|
+
+   EvalFun:
+   |[ isreal(e) ]| -> |[ 0 ]|
+   where <oncetd(?Constant("i"))> |[ e ]| 
+
+   EvalFun:
+   |[ is_complex(e) ]| -> |[ 1 ]|
+   where  <oncetd(?Constant("i"))>|[ e ]|
+
+   EvalFun:
+   |[ is_complex(e) ]| -> |[ 0 ]|
+   where <is-scalar + Matrix(id)> |[ e ]| ;
+         <not(oncetd(?Constant("i")))> |[ e ]|
+
+   EvalFun:
+   |[ finite(e) ]| -> |[ 1 ]|
+   where <is-scalar-num> |[ e ]|
+	 ; <not(?Inf())>|[ e ]|
+         ; <not(?NaN())> |[ e ]|
+
+
+   EvalFun:
+   |[ isfinite(e) ]| -> |[ 1 ]|
+   where <is-scalar-num> |[ e ]|
+	; <not(?Inf())>|[ e ]|
+        ; <not(?NaN())> |[ e ]|
+
+   EvalFunMapping:
+   Call(f, [Matrix(ms)]) -> <apply-in-matrix(|f)> Matrix(ms)
+   where <is-mapping-function>f
+
+
+
+strategies
+
+  apply-in-matrix(|f) =
+   Matrix(map(map(\e -> <EvalFun> Call(f, [e]) \ ) ))
+  
+

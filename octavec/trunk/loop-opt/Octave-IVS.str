@@ -1,0 +1,76 @@
+module Octave-IVS 
+imports 
+  liblib 
+  liboctavec
+  Octave-IVexp-Norm // output-control
+
+// This trafo assumes that loops are normalized and that expressions
+// are evaluated
+ 
+signature
+  constructors
+
+    AIV: List(FIV) -> Exp
+
+strategies
+
+  io-Octave-IVS = 
+    io-wrap(ivs)
+
+  ivs = 
+    bottomup(try(IVS-on-Loop))
+     
+rules
+
+  IVS-on-Loop:
+     |[ for x = (e1: e2 : e3) do e4 end ]| -> 
+         |[ {for x = (e1 : e2 : e3) do e5 end; ~e*} ]|
+   where 
+       <bottomup(try(find-AVI(| |[ x ]| , |[ e3 ]| )))> |[ e4 ]|
+     ; replace-AIV => |[ e5 ]|
+      ; <bagof-ForFinalizeAssign; reverse> |[ x ]| => e*
+
+   find-AVI(|iv, u) =
+       ?|[ x = e ]| 
+     ; is-AVI
+     ; normalize-exp
+     ; ExposeAVI(|iv, u)
+
+   is-AVI =
+     ?|[ x = e ]| 
+    ; where( <oncetd(?|[ x ]| )> |[ e ]|)
+  
+  ExposeAVI(|iv, u) :
+   |[ x = ( (e1 * x) + e) ]| -> AIV([ |[ x ]| ])
+    where rules (
+            ReplaceAIVPost : 
+              |[ x ]| -> |[ x + (~iv * e) ]| 
+
+            SwitchAIVPostToPre :
+	      |[ x + (~iv * e) ]| -> (|[ x + ((~iv - 1) * e) ]|, |[ x ]|)
+          );
+          rules(
+            ForFinalizeAssign :+
+              iv -> |[ x = ( (e1 * x) + (~u * e)) ]|
+          )
+	  
+strategies
+
+  replace-AIV =
+    bottomup-rev-list(
+      try( Replace-Assignment + ReplaceAIVPost )
+    )
+
+
+rules
+      
+  Replace-Assignment:
+    AIV([exp-post]) -> |[ nil ]|
+    where <SwitchAIVPostToPre> exp-post => (exp-pre, x)
+        ; rules( ReplaceAIVPost :  x  -> exp-pre )
+
+   bottomup-rev-list(s) =
+      rec x(all-rl(x); s)
+      
+   all-rl(s) = reverse-map(s) <+ all(s)
+   

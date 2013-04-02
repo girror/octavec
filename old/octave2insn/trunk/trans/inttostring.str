@@ -1,0 +1,5 @@
+module inttostring
+imports lib
+strategies
+ 
+  inttostring = iowrap(alltd(is-int; int-to-string))

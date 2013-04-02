@@ -1,0 +1,3 @@
+global __tic_toc_timestamp__
+tic
+__tic_toc_timestamp__

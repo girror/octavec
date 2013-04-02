@@ -1,0 +1,27 @@
+module octave-bench-file
+imports liblib 
+
+strategies
+
+  io-octave-bench-file =
+    xtc-input-wrap(inc-options, octave-bench-file)
+
+  octave-bench-file =
+    ?FILE(fn)
+  ; where( <remove-extension>fn => bn )
+  ; xtc-transform(!"octave-frontend",!["--no-check"|<pass-includes>])
+  ; where(
+      xtc-transform(!"pp-octave",!["--real-octave"])
+    ; copy-to(<concat-strings>[bn,".org.m"])
+    )
+  ; xtc-transform(!"octave-opt")
+  ; xtc-transform(!"pp-octave",!["--real-octave"])
+  ; copy-to(<concat-strings>[bn,".opt.m"])
+
+  inc-options =
+    ArgOption("-I" + "--Include",        
+      where(<post-extend-config>("-I", [<id>])); !(),
+      !"-I d | --Include d   Include functions from directory d")
+
+  pass-includes =
+      <get-config<+![]> "-I" ; foldr(id, conc, !["-I", <id>])

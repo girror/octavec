@@ -1,0 +1,22 @@
+module octave/lang/eval/cell
+
+rules
+
+  // CellIndex
+
+  EvalCellIndex:
+   CellIndex(Cell([es]), [Int(i)]) -> <get-col> (i,es)
+
+  EvalCellIndex:
+   CellIndex(Cell([es]), [Int(x),Int(y)]) -> <get-col> (y,cx) 
+   where <get-row> (x,es) => cx 
+
+  EvalCellIndex:
+   CellIndex(x, [Int("1")]) -> x
+   where <is-scalar>x
+
+ // For colon
+
+  EvalCellIndex:
+  CellIndex(Cell([[x]]),[Colon()]) -> x 
+  where <is-scalar + ?String(_)> x

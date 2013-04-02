@@ -1,0 +1,1 @@
+Program([FunDec(VarDef("prueba_tb"),[],[],Stats([Assign(Var("n"),"=",Int(4)),Assign(Var("n"),"=",Int(8)),Assign(Var("r"),"=",Int(5)),Assign(Var("a"),"=",DataOp("+",[DataOp("--",[Var("n")]),Var("r")])),Assign(Var("b"),"=",Matrix([[Int(1),Int(2),Int(3),Int(4)]])),Assign(Var("c"),"=",DataOp("--",[Var("b")]))]))])

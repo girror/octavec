@@ -1,0 +1,15 @@
+module pp-insn
+imports xtc-lib stratego-xt-xtc-tools 
+ 
+strategies
+ 
+  io-pp-insn =
+    xtc-io-wrap(
+          octave-ensugar 
+        ; xtc-transform(!"ast2abox", !["-p", <xtc-find> "INSN-pretty.pp.af"])
+        ; xtc-abox-format
+        ; xtc-abox2text
+    )
+
+   octave-ensugar=
+     xtc-transform(!"Octave-Desugar")

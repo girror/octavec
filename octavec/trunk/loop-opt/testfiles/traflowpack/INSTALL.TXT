@@ -1,0 +1,48 @@
+This file is INSTALL.TXT
+------------------------
+
+  TraFlowPack, v1.0 by Arthur van Dam
+                    _                  ___             ___    
+        |¯¯¯\_  ___|,| /¯¯¯\      __ _/[]L\__        _/[]L\__                 
+  [¯¯¯¯¯| º / \|  __|||  O  | __ / /(_,.__,._)  ___ (_,.__,._)
+   ¯| |¯|_|/ A \ |_] |_\___/ v  v /---`'--`'--_/[]L\__`'--`'---
+    |_|   /_/-\_\| |    |   \_/\_/           (_,.__,._)
+                    ¯¯¯¯          P A C K   ---`'--`'--
+                                  ¯¯¯¯¯¯¯
+  TraFlowPack consists of:
+   * TraFlow traffic simulator
+   * MMFVPDES, moving mesh finite volume PDE solver
+
+-------------------
+Installation Notes:
+-------------------
+1. Create a directory where you want to install TraFlowPACK.
+   for example 'c:\traflowpack\'
+
+2. Unzip all the files in 'traflowpack_vx.x.zip' into this directory.
+   'vx.x' stands for the version, e.g. 'v1.0'.
+   Make sure the directory-structure as in the zipfile is maintained
+   after unzipping.
+
+3. Start MATLAB (TraFlowPACK has been tested on MATLAB 5.3)
+
+4. Change to the traflowpack-directory by entering:
+   cd c:\traflowpack\
+
+5. Auto-configure the necessary paths by entering:
+   addpaths
+
+6. TraFlowPack is now ready for use. New users should start with:
+   help traflowpack
+
+IMPORTANT!
+   The path-configuration in step 5. has to be done each time a new
+   MATLAB-session is started. Optionally the path can be made lasting by
+   adding all the directories mentioned in 'addpaths.m' to the
+   standard-MATLAB file 'pathdef.m'.
+
+-------------
+Further info:
+-------------
+Further information on functionality, usage, and copyright-permissions
+can be found in the file 'README.TXT'

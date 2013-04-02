@@ -1,0 +1,473 @@
+module octave/o2c/statement
+imports 
+  octave/o2c/-
+
+strategies
+
+  TranslateStmt(exp) =
+    dr-ignore-state( 
+      log(|Debug(),"Translating expression: ",<id>)
+    ;
+    ( TranslateWhile(exp)
+    + TranslateFor(exp)
+    + TranslateStats(exp)
+    + TranslateIf(exp)
+    + TranslateMultiAssignment(exp)
+    + TranslateIndexAssign(exp)
+    + TranslateStructAssignment(exp) 
+    + TranslateDldStatement(exp)
+    + TranslateCellAssignmentPrefer(exp)
+    + TranslateCellAssignment(exp)
+    + TranslateBuiltinCallZeroOrOneAssignment(exp)
+    + TranslateBuiltinCallAssignment(exp)
+    + TranslateAssignment(exp)
+    + TranslateSubscriptAssign(exp)
+    + TranslateAssignmentLast(exp)
+    + TranslatePrint
+    + TranslateMultipleReturn
+    + TranslateReturn
+    + TranslateBreak
+    + TranslateContinue
+    + TranslateGlobal(exp)
+    + TranslateStatic(exp)
+    + TranslateExpAsStmt(exp)
+    ) ; if bagof-init-stats ; reverse ;concat; uniq => s ; not([]) then 
+           !stm |[ { ~dec*:s ; ~stm:<id> } ]| 
+        else 
+          id 
+        end 
+   <+ fatal-error(|"Could not translate: ")
+   | "init-stats" )
+
+  TranslateExpAsStmt(exp) =
+    ?Call(Var("disp"),_) ; !stm |[ ~exp:<TranslateBuiltinCall> ; ]|
+ <+ ?Call(Var("pwd"),_) ; !stm |[ ~exp:<TranslateBuiltinCall> ; ]|
+ <+ ?Call(_,_){UNIT()} ; !stm |[ ~exp:<exp> ; ]|
+ <+ \ Var(v) -> Print(v,Var(v){<get-octave-type>}) \ ; TranslateStmt(exp)
+ <+ !stm |[ ~exp:<exp> ; ]|
+
+  fatal-error(|msg) =
+    say(<concat-strings>["\n*** ERROR *** ", msg,"\n"])
+  ; debug-pp
+  ; <exit>-1
+
+  debug-pp =
+    where(
+      xtc-temp-files(
+        write-to 
+      ; <call>(<silent(xtc-find)>"pp-aterm",["-i",<?FILE(<id>)>,"--max-depth","6"]) 
+      )
+    )
+
+rules
+
+//  TranslateSimpleAssignment = 
+
+
+  TranslateMultiAssignment(exp) = 
+    {| nargout:
+       ?AssignMulti(vs,"=",e)
+     ; <length>vs => n
+     ; if not(<?Call(Var(<is-dld-function+is-builtin-function>),_)>e) then
+         rules( nargout : _ -> n )
+       end
+     ; new => y
+     ; <add-indices>vs
+     ; map({i,j,e0,e1,lv:
+         ?(i,lv)
+       ; <dec>i => j
+       ; <cast-expression(!exp |[ y(j) ]| |<get-octave-type>lv)>() => e1
+       ; <exp>lv => e0
+       ; !stm |[ e0 = e1 ; ]|
+       }) => stm*
+     ; <exp>e => e1
+     ; !stm |[
+         {
+           octave_value_list y ;
+           y = e1 ;
+           stm*
+         }
+       ]|
+    |}
+
+
+  TranslateGlobal(exp) :
+    Global(v) -> stm |[ {} ]|
+      where rules( is-global : Var(v) -> Var(v) )
+
+  TranslateGlobal(exp) :
+    GlobalInit(y,e) -> stm |[ if(!y.is_defined()) { y = e1 ; } ]|
+      where rules( is-global : Var(y) -> Var(y) )
+          ; <exp>e => e1
+
+  TranslateStatic(exp) :
+    Static(v) -> stm |[ {} ]|
+      where rules( is-static : Var(v) -> Var(v) )
+      
+  TranslateStatic(exp) :
+    StaticInit(y,e) -> stm |[ if(!y.is_defined()) { y = e1 ; } ]|
+      where rules( is-static: Var(y) -> Var(y) )
+          ; <exp>e => e1 
+
+  TranslateStats(exp) :
+    Stats(es1) -> stm |[ { ~stm*:<map(TranslateStmt(exp))>es1 } ]|
+
+// assignments
+  TranslateSubscriptAssign(exp) =
+    ?t@Exp |[ lv = e0 ]| 
+  ; <?Exp |[ ~v [~*es] ]|>e0 
+  ; ( <get-octave-type>v <+ <get-octave-type>t ) => tp 
+    ; not(is-octave-value-type)
+    ; ( 
+      if <length>es => 1 then
+        <check-static-matrix-size(|es)>tp 
+      ; <cast-expression(!FunCall(<exp>v, <map(exp;dec-c)>es)|tp)>e0  => e1
+      else
+        <check-static-matrix-dims(|es)>tp 
+      ; <cast-expression(!FunCall(<exp>v, <map(exp;dec-c)>es )|tp)>e0 => e1
+      end
+    ; !stm |[ ~id:<exp>lv = ~exp:e1 ; ]| 
+   <+ if <fetch-elem(Colon()+get-octave-type;is-matrix-type)>es then
+
+	new => y
+        ; ! dec|[ octave_value y; ]| => ss
+        ; rules( init-stats:+ _ -> [ss])
+        ; !stm |[ { ~id:y = ~exp:<exp>e0 ; 
+	            ~id:<exp>lv = ~id:y . array_value(0); }
+               ]|
+      else
+        !stm |[ ~id:<exp>lv = ~id:<exp>v . checkelem(~exp*:<map(exp;dec-c)>es) ; ]|
+      end
+    )
+
+
+  TranslateSubscript =
+    ?Exp |[ ~v [~*es] ]| 
+  ; get-octave-type => ts1 
+  ; <get-octave-type>v => ts  
+  ; ( if <length>es => 1 then
+      <check-static-matrix-size(|es)>ts
+    ; !FunCall(<TranslateExp>v, <map(TranslateExp;dec-c)>es ) => e1
+    else
+      <check-static-matrix-dims(|es)>ts
+    ; !FunCall(<TranslateExp>v, <map(TranslateExp;dec-c)>es ) => e1
+    end 
+  <+ new => y
+  ; <subscripts-to-idx-vector(|y)>es => is
+  ; rules( init-stats :+ _ -> is )
+  ; <TranslateExp>v => e2
+  ; if <fetch-elem(Colon())>es + <is-matrix-type>ts1 then 
+      !exp |[ e2.index(y) ]|  
+    else 
+      !exp |[ e2.index(y)(0) ]|
+    end
+  )
+
+  TranslateIndex(exp) = 
+  ( ?Exp |[ ~v [~*es] ]| ; !exp |[ ~str:(<double-quote>"(") ]| => op )
+ // + ?Exp |[ ~v {~*es} ]| ; !exp |[ ~str:(<double-quote>"{") ]| => op
+ // + ?Exp |[ ~v .x0  ]| ; ![<string-to-octave-string>x0] => es ; !exp |[ ~str:(<double-quote>".") ]| => op ) 
+  ; <get-octave-type;is-octave-value-type>v 
+  ; new => y
+  ; ![dec |[  octave_value_list y ; ]| | <map(exp);list-to-ov-list(|y)>es ] => stmts
+  ; rules( init-stats :+ _ -> stmts)
+  ; !exp |[ ~exp:<exp>v . single_subsref(~exp:op,y ) ]|
+
+
+  TranslateIndex(exp) = 
+  ( ?Exp |[ ~v .x0  ]|
+    ; ![<string-to-octave-string>x0] => es 
+    ; !exp |[ ~str:(<double-quote>".") ]| => op 
+  ) 
+  ; <get-octave-type;is-octave-value-type>v 
+  ; new => y; new => x
+  ; ![ dec |[  octave_value_list y ; ]| 
+     , dec |[ ~type-spec:"std::list<octave_value_list>" x ;]|
+     , <map(exp);list-to-ov-list(|y)>es 
+     , stm |[ x.push_front(y) ;]|
+     ] 
+  ; flatten-list=> stmts
+  ; rules( init-stats :+ _ -> stmts)
+  ; !exp |[ ~exp:<exp>v . subsref(~exp:op,x,1)(0) ]|
+
+  TranslateIndexAssign(exp) =
+  ( ?Exp |[ ~v [~*es] = e1 ]| ; !exp |[ ~str:(<double-quote>"(") ]| => op
+  + ?Exp |[ ~v {~*es} = e1 ]| ; !exp |[ ~str:(<double-quote>"{") ]| => op
+  + ?Exp |[ ~v .x0  = e1 ]| ; ![<string-to-octave-string>x0] => es ; !exp |[ ~str:(<double-quote>".") ]| => op ) 
+  ; <get-octave-type;is-octave-value-type>v
+  ; new => z ; new => y ; new => x
+  ; ![ dec |[ octave_value_list y ; ]| 
+     , dec |[ octave_lvalue z ; ]| 
+     , dec |[ ~type-spec:"std::list<octave_value_list>" x ;]|
+     , <map(exp);list-to-ov-list(|y)>es 
+     , stm |[ x.push_front(y) ;]|
+     ] 
+  ; flatten-list => stmts
+  ; !stm |[ { ~stm*:stmts 
+              z = octave_lvalue(&(~id:<exp>v));
+              z .set_index(~exp:op,x);
+              z .assign(~id:"octave_value::op_asn_eq" , ~exp:<exp>e1) ;
+            }
+         ]|
+
+  string-to-octave-string =
+    !String(<id>)
+
+  subscripts-to-idx-vector(|lv) =
+    add-indices
+  ; where( length => l)
+  ; map(\ (i,e) -> stm |[ ~id:(lv) (~int:<dec>i ) = octave_value(~exp:<TranslateColon <+ TranslateExp>e).index_vector() ; ]| \)
+  ; ![<concat-strings>["Array<idx_vector> ",lv," (",<int-to-string>l,") ;"] |<id>]
+
+  dec-c =
+    !exp |[ ~exp:<id> - 1 ]|
+
+  TranslateAssignment(exp) =
+    ?Exp |[ ~lv [~*es] = e ]|
+  ; ( <get-octave-type>lv => tp 
+  ; if <length>es => 1 then 
+      <check-static-matrix-size(|es)>tp 
+    ; !FunCall(<exp>lv, <map(exp;dec-c)>es ) => e1
+    ; !stm |[ ~id:e1 = ~exp:<exp>e ; ]|
+    else 
+      <check-static-matrix-dims(|es)>tp 
+    ; !FunCall(<exp>lv, <map(exp;dec-c)>es ) => e1 
+    ; !stm |[ ~id:e1 = ~exp:<exp>e ; ]| 
+    end 
+    <+ <octave-to-c-type>lv => ts ; not(?type-spec |[ octave_value   ]|)
+     ; !stm|[ 
+             {
+               // set index...
+               ~stm*:<map(subscript-to-set-index(exp|lv))>es
+               // do assign 
+               ~id:"::assign" (~exp:<exp>lv,~exp:<octave-exp-to-float-ndarray(exp)>e,~exp:<exp>lv .resize_fill_value ()) ;
+               // clear index
+               ~exp:<exp>lv .clear_index();
+             }
+           ]|
+    )
+
+  subscript-to-set-index(exp|lv) :
+     e -> stm |[ ~exp:<exp>lv .set_index(~exp:<TranslateRange>e) ; ]| 
+       where is-range
+
+  subscript-to-set-index(exp|lv) :
+     e -> stm |[ ~exp:<exp>lv .set_index(~exp:<exp>e) ; ]| 
+       where not(is-range)
+
+  indices-to-dim-vector(exp|x) = 
+    add-indices ; map(\ (i,e) -> stm |[ x(~int:<dec>i) = ~exp:<exp>e ; ]| \) ; !stm |[ { ~stm*:<id>}]|
+
+  check-static-matrix-size(|es) = 
+    ?MATRIX(_,ds)
+  ; <foldr(!1,(?Int(<string-to-int>),id);mul)>ds => size
+  ; <?[Int(<string-to-int>)]>es 
+  ; <lt>(<id>,<subt>(size,1))
+
+  check-static-matrix-dims(|es) =
+    ?MATRIX(_,ds)
+  ; <zip>(<map(?Int(<id>))>es,<map(?Int(<id>))>ds)
+  ; map(leqS)
+
+  TranslateMatrix(exp) :
+    e@Matrix(_) -> exp |[ y ]|  
+      where 
+       <( is-int-matrix     ; !"NDArray"
+        <+ is-float-matrix   ; !"NDArray"
+        <+ is-bool-matrix    ; !"boolNDArray"
+        <+ is-complex-matrix ; !"ComplexNDArray"
+        )>e => dt
+      ; new => y
+      ; <?Matrix(<get-matrix-dimensions>)>e => (r,c)
+      ; <matrix-to-assignments(exp|Var(y))>e => stmts
+      ; ![ dec  |[ ~type-spec:dt y ; ]| 
+         | stm* |[  y = ~id:(dt) (dim_vector(~int:r,~int:c)) ; 
+                    ~stm*:stmts  ]|
+         ] => tm
+      ; rules( init-stats :+ _ -> tm
+               get-size   : y -> (r,c)
+               get-m-type : y -> dt
+             )
+
+  is-int-matrix = Matrix(map(map(Int(id)+get-octave-type;is-int-matrix-type)))
+  is-float-matrix = Matrix(map(map(Int(id)+get-octave-type;is-int-type+Float(id)+get-octave-type;is-float-type)))
+  is-bool-matrix = Matrix(map(map(True+False+get-octave-type;is-bool-type)))
+  is-complex-matrix = oncetd(Constant("i")+get-octave-type;is-complex-type)
+ 
+ TranslateMatrixDynamic(exp) :
+   e@Matrix(_) -> exp |[ y ]|
+   where  <oncetd(is-value + ?Var(_))> e
+	; <extract-matrix-dimension(exp)>e => (e0,e1)
+	; new => y
+	; <matrix-to-assignments(exp|Var(y))>e => stmts
+	; !"NDArray" => dt
+	; ![ dec  |[ ~type-spec:dt y ; ]| 
+           | stm* |[  y = ~id:(dt) (dim_vector(~exp:e0,~exp:e1)) ; 
+                    ~stm*:stmts  ]|
+           ] => tm
+        ; rules( init-stats :+ _ -> tm  
+                 get-size   : y -> (e0,e1)
+                 get-m-type : y -> dt                
+                )
+
+  TranslateAssignmentLast(exp) :
+    |[ lv = e ]| -> rs
+    where <not(is-global)>lv
+          ; !stm |[ ~id:<TranslateVar>lv = ~exp:<exp>e ; ]| => rs
+          ; where(?Stat(<id>)
+               ; ?Assign(_,_,<id>)
+               ; if ?Id(x) then
+                      try(<get-size> x => (r,c)
+                         ; rules(InitVar: lv -> x)
+                         )
+                 end
+             )
+
+  TranslateAssignmentLast(exp) :
+    |[ lv = e ]| -> stm |[ set_global_value(~id:<exp>n, ~exp:<exp>e) ; ]|
+    where <is-global>lv => Var(<string-to-octave-string>) => n
+
+  extract-matrix-dimension(exp) :
+   Matrix(ms) -> (r,c)
+   where <extract-matrix-rows(exp)> ms => r
+        ; <Hd; extract-matrix-cols(exp)> ms =>  c
+        
+  extract-matrix-rows(exp):
+   [r|rs] -> rows
+   where <foldr(!r; Hd; to-rows(exp),
+           (Hd; to-rows(exp),id); add-expr(exp))>rs => rows
+
+  extract-matrix-cols(exp) :
+   [c|cs] -> cols
+   where  <foldr(!c; to-columns(exp), (to-columns(exp), id); add-expr(exp))>cs => cols
+          
+  to-rows(exp) :
+     x -> c:exp|[ ~exp:<exp>x. rows() ]|
+     where InitVar
+
+  to-rows(exp) :
+     x -> 1
+     where not(InitVar)
+        
+  to-columns(exp) :
+     x -> c:exp|[ ~exp:<exp>x. columns() ]|
+     where  InitVar
+     
+  to-columns(exp) :
+     x -> 1
+     where not(InitVar)
+     
+  add-expr(exp) :
+    (e0,e1) -> c:exp|[ e0 + e1 ]|
+   
+   
+  get-size-row =
+    foldr(!0, (Fst,id); add)
+
+  get-matrix-dimensions :
+    rs -> (r,c)
+      where
+        <?[<length>|_]>rs => c
+      ; <length>rs => r 
+    <+ !(0,0) => (r,c) 
+
+  matrix-to-assignments(exp|lv) =
+    ?Matrix(<add-indices>)
+  ; rules(LastRow: _ -> 1)
+  ; map(\ (i,r) -> <row-to-assignments(exp|lv,i)>r\; increment-row)
+  
+  
+  increment-row =
+    where (<LastRow>(); inc-index ; ?r; rules(LastRow: _ -> r))
+  
+  
+  row-to-assignments(exp|lv,i) =
+    add-indices
+  ; rules(LastCol: _ -> 1)
+  ; map(set-row-index(exp|lv,i))
+
+
+  set-row-index(exp|lv,i) :
+   (j, e) -> |[ ~id:<exp>lv.elem(~exp: e1,~exp:e2) = ~exp:<exp>e ; ]|
+   where <is-value> e        
+         ; <get-current-r-c> (i, j) => (e1, e2)
+         ; <inc-index; inc-index> e2 => e3
+         ; rules( LastCol: _ -> e3 )
+
+   
+  set-row-index(exp|lv,i) :   
+    (j, lv1) -> |[ ~id:<exp>lv.insert(x.array_value(), ~exp:e0,~exp:e1); ]|
+    where <?Var(x)> lv1
+          ; <get-current-r-c> (i, j) => (e0, e1)
+          ; rules(LastCol: _ -> c:exp|[ x.columns() + e1 + 1 ]|
+                  LastRow: _ -> c:exp|[ x.rows() + e0 ]|
+             )
+          
+   set-row-index(exp|lv,i) :
+   (j, lv1) -> |[ ~id:<exp>lv.elem(~exp:e0,~exp:e1) = ~exp:<exp>lv1.double_value() ; ]|
+   where <?Var(y); !y> lv1  => x
+         ; <not(get-size-of-init-var)> x
+         ; <not(get-size)> x
+         ; <get-current-r-c> (i,j) => (e0, e1)
+          ; rules(LastCol: _ -> c:exp|[ e1 + 1 ]|)   
+
+  cell-to-assignments(exp|lv) =
+    ?Cell(<add-indices>)
+  ; map(\ (i,r) -> <row-to-assignments-cell(exp|lv,i)>r \)
+
+  row-to-assignments-cell(exp|lv,i) =
+    add-indices
+  ; map({y : 
+      \ (j,e) -> stm |[ { octave_value_list y ; 
+                          y(0) = ~int:i ; 
+                          y(1) = ~int:j ; 
+                          ~id:<exp>lv.assign(y, octave_value(~exp:<exp>e)) ; 
+                        } ]| 
+           where(new => y) \
+    })
+   
+   get-size-var =
+     get-size-of-init-var <+ !(1,1)
+    
+   get-size-of-init-var =
+      InitVar ; get-size
+
+   get-current-r-c :
+     (i,j) -> (r-idx, c-idx)
+     where <get-row-idx>i => r-idx
+           ; <get-col-idx>j => c-idx
+            
+   get-row-idx :
+     i  -> r
+     where <LastRow>() 
+         ; is-int
+         ; dec => r
+
+   get-row-idx :
+     i  -> c:exp|[ e - 1 ]|
+     where <LastRow>() => e
+         ; not(is-int)
+            
+   get-col-idx :
+     i  -> r
+     where <LastCol>() 
+         ; is-int
+         ; dec => r
+
+   get-col-idx :
+     i  -> c:exp|[ ~exp:e - 1 ]|
+     where <LastCol>() =>e
+         ; not(is-int)
+
+   inc-index :
+    i -> j
+    where (is-int <+ ?IntConst(<id>)); inc => j
+    
+   inc-index:
+    e -> c:exp |[ ~exp: e + ~int:1 ]|
+    where not(is-int)   
+    
+   add-exp :
+    (e, e1) -> c:exp|[ e + e1 ]|
+ 
+  initialize-octave2c-stuff = id // rules( is-global : Var("ans") -> Var("ans") )

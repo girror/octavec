@@ -1,0 +1,13 @@
+# Standard make rules for applying components of the Octave 2 INSN 
+# translation
+
+# PROGRAMS using XTC 
+
+
+octave2insntbl         = $(INSN)/share/sdf/insn/Octave2INSN.tbl  
+
+# Parsing INSN tools ### ############################### 
+
+%.fix: %.ins $(oct2insntbl )
+	$(SGLR)/bin/sglr -f -t -2 -p $(oct2insntbl) -i $< -o $@
+ 

@@ -1,0 +1,14 @@
+This file is HISTORY.TXT
+------------------------
+
+TraFlowPACK version history
+
+1.0 [June 19, 2002]
+- First public version
+
+1.01 [July 1, 2002]
+- Added dirichlet_bounds.m, corrected a typo in kerner_g.m
+
+1.02 [October 2, 2002]
+- in plot_data.m: Improved Window-positioning, aimed at the MSWindows platform.
+- in show_results.m: Removed a minor error in setting MM_numplotdata.

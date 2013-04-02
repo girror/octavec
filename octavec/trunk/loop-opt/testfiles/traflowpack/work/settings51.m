@@ -1,0 +1,30 @@
+function [MM_a, MM_b, f_init, f_monitor, f_f, f_dfdu, f_g, f_boundaries] = settings51()
+% SETTINGS51    settings file for 'Burgers example'
+
+% Copyright (C) 2002 Arthur van Dam, Delft, The Netherlands
+% 
+% This file is part of TraFlowPACK.
+% 
+% TraFlowPACK is free software; you can redistribute it and/or modify
+% it under the terms of the GNU General Public License as published by
+% the Free Software Foundation; either version 2 of the License, or
+% (at your option) any later version.
+% 
+% TraFlowPACK is distributed in the hope that it will be useful,
+% but WITHOUT ANY WARRANTY; without even the implied warranty of
+% MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+% GNU General Public License for more details.
+% 
+% You should have received a copy of the GNU General Public License
+% along with TraFlowPACK; if not, write to the Free Software
+% Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+% 
+% More info at: http://www.inro.tno.nl/five/traflow/
+MM_a = 0;
+MM_b = 2*pi;
+f_init = 'init51';
+f_monitor = 'monitorBM';
+f_f = 'f51';
+f_dfdu = 'dfdu51';
+f_g = 'g51';
+f_boundaries = 'periodic_sol';

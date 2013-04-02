@@ -1,0 +1,144 @@
+module Octave-TCSystem
+
+strategies
+
+ 
+    alternative(s) =
+     ( Prog(DeclareFunctions(s),s){id}
+    <+ |[ <id>[<*s>] = <id> ]|
+    <+ |[ <id>{<*s>} = <id> ]|
+    <+ |[ <id> = <id> ]|
+    <+ tc-asg-multi(s)
+    <+ |[ if <s> then <id> end]|
+    <+ |[ if <s> then <id> else <id> end]|
+    <+  tc-while(s)
+    <+  tc-for(s)
+    <+ |[ <id:id>(<*s>) ]|
+    <+ |[unwind_protect <s> unwind_protect_cleanup <id> end ]|
+    <+ Print(id,s)
+    )
+
+      
+    
+
+    tcheck-expressions(s) = 
+        (tc-global <+ TcConst <+ TcFieldVar 
+	<+ tc-var  
+	<+ tc-exp(s) <+ TcIncompleteType ) 
+ 
+ 
+    tc-exp(s) =
+	    TcExpPrefer <+ DefShape // <+ EvalFun;try(s)
+	 <+ LibEval(s) <+ EvalExpr(s)
+	 <+ TcExp
+	 <+ TcBFunc <+ TcMapFunc <+ TcFunc 
+/*	 <+ ElimIfThen; s
+	 <+ ElimFor; s   
+	 <+ ElimIfThen; s
+	 <+ ElimIf; s
+	 <+ ElimWhile; s */
+	 <+ TcExpCall(s) 
+	 <+ TcMatrix
+	 <+ TcMExp
+ 
+    tcheck-stats(s) = 
+	tc-assign(s)
+        <+ UnwindProtect(id,s)
+	<+ tc-if(s)
+	<+ tc-ifthen(s)  
+
+   tc-var = {x: ?x; bagof-TcVar 
+		; if ?[] then fail
+		  else select-max-typeshape(|x)
+		  end
+		}
+
+   tc-global = {x:?x; bagof-TcGlobal 
+		; if ?[] then fail
+		  else  select-max-typeshape(|x) <+ get-max-record-type(|x) 
+		  end
+                }
+
+
+   select-max-typeshape(|x) = 
+    ?[<id>]  <+ get-matrix-typeshape(|x)
+   
+   get-max-record-type(|x)  =
+    ?[RECORD(rs)|_];!x{RECORD(rs)}
+        
+
+   get-matrix-typeshape(|x) =
+   {as,t,sh:
+      ?as
+    ; get-max-type(get-type) => t
+    ; <get-max-shape(extract-shape)>as => sh 
+    ; <set-as-scalar <+ set-as-matrix> (x,t,sh) 
+   }
+
+
+  get-max-type(get-type) = 
+    foldr(!NIL,  (try(get-type <+ get-type-esp), id)
+		; (get-wide-scalar <+ get-char))
+
+  get-max-shape(extract-shape) = 
+     foldr(![Int("0"),Int("0")],
+	  (extract-shape , id)
+	  ; get-wide-shape <+ ![SKIP(),SKIP()] )
+     
+
+
+  set-as-scalar =
+     ?(x, t, Scalar)
+    ;!x{ SCALAR(t) }
+
+  set-as-matrix =  
+    ?(x, t, sh*) 
+    ;!x{ |[matrix(t,dim(sh*))]| } 
+
+
+   tc-if(s) = 
+      |[ if <id> then <id> else <id> end]|
+    ; |[ if <id> then <s> else <id> end]| \TcVar,TcGlobal/|[ if <id> then <id> else <s> end]|
+
+
+   tc-ifthen(s) =   
+      |[ if <id> then <s> end]| \TcVar,TcGlobal/ id
+
+
+   tc-for(s) =
+    |[ for <id:id> = <s>  do <id> end ]|
+    ; TcFor(s) 
+
+
+   tc-while(s)=
+    |[ while <s> do <s> end ]|
+
+   tc-asg-multi(s) = 
+   {| NumArgsOut:
+       ?|[ [ lvs* ] = e ]|
+      ; where( <length>lvs* => num; rules(NumArgsOut: () -> num)) 
+      ; |[ [<multi:id>] = <s> ]|
+      ; TcAssg(s) 
+   |}
+
+   tc-assign(s) =  
+   {| NumArgsOut:
+    |[ <id> = <id> ]|
+     ; where( rules(NumArgsOut: () -> 1) )
+     ; |[ <id> = <s> ]|
+     ; try(TcAssg <+  TcAssg(s) ) 
+   |}
+
+  /** 
+   * DR to bind the body of a function
+   * to be used when a call is visited
+   */
+   GetFunction =
+    {f,fname:
+     ?f@Function(_,fname,_,_)
+     ; where(rules(GetFuncDef: fname -> f))
+    }
+
+
+
+

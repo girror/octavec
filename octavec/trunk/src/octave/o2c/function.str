@@ -1,0 +1,146 @@
+module octave/o2c/function
+
+strategies
+  translate-function-body =
+    TranslateStmt(TranslateExp)
+
+      
+  translate-function = 
+    {| Type, return-var, in-args :
+         TranslateProc
+      <+ TranslateFunc
+      <+ <fatal-error>["Cannot translate function! \n",<id>]
+    |} 
+
+  translate-function-oct = 
+    {| Type, return-var, in-args :
+         TranslateFuncOct <+ <fatal-error>["Cannot translate function! \n",<id>]
+    |} 
+
+  gather-declarations(|in-args) = 
+    <union>( <return-var; ![<var-to-declaration-stmt>]<+![]>
+           , <diff>( <diff>( <collect-om(var-to-declaration-stmt,union,?Call(_,<id>))>
+                           , <collect-globals;map(var-to-declaration-stmt)>
+                           ) 
+                   , <map(!Stat(<id>))<+![]>in-args
+                   ) 
+           )
+
+  gather-declarations2(|in-args) = 
+            <diff>( <diff>( <collect-om(var-to-declaration-stmt,union,?Call(_,<id>))>
+                           , <collect-globals;map(var-to-declaration-stmt)>
+                           ) 
+                   , <map(!Stat(<id>))<+![]>in-args
+                   ) 
+
+  collect-globals =
+    collect(?Global(<!Var(<id>)>)+?GlobalInit(<!Var(<id>)>,_)+?Static(<!Var(<id>)>)+?StaticInit(<!Var(<id>)>,_) )
+
+  var-to-declaration = 
+    ?Var(n) ; type-to-declaration(|n) 
+
+  var-to-declaration-stmt =
+    !stm |[ ~exp:<var-to-declaration> ; ]|
+
+  type-to-declaration(|n) = 
+    !|[ ~type-spec:<octave-to-c-type> ~id:n ]| 
+
+
+
+// methods
+rules
+
+ TranslateProc:
+   |[ function [ a1* ] = f(a0*) e1 end ]| 
+     -> fun-def |[ 
+          void f(~param-dec*:in-args) {
+            ~dec*:<gather-declarations(|in-args)>e1
+            ~stm: stats 
+          } 
+	]|    
+   where 
+     <[]>a1*
+   ; <map(var-to-declaration)>a0* => in-args 
+   ; rules( in-args : _ -> in-args ) 
+   ; <translate-function-body>e1 => stats 
+
+
+// functions
+rules
+
+ TranslateFunc:
+   |[ function [ e0 ] = f(a0*) e1 end ]| 
+     -> fun-def |[ 
+           ~type-spec:ts f(~param-dec*:in-args) {
+             ~dec*:<gather-declarations(|in-args)>e1
+             ~stm: stats
+             return ~exp:<TranslateExp>e0; 
+           }
+        ]|    
+   where 
+     <diff>([e0], a0*) => e2
+   ;  rules( return-var : _ -> e2 ) 
+   ; <octave-to-c-type>e0 => ts 
+   ; <map(var-to-declaration)>a0* => in-args 
+   ; <translate-function-body>e1 => stats
+
+// functions
+rules
+
+ TranslateFunc:
+   |[ function [ a* ] = f(a0*) e1 end ]| 
+     -> fun-def |[ 
+           octave_value_list f(~param-dec*:in-args) {
+             octave_value_list x ;
+             ~dec*:<gather-declarations(|in-args)>e1
+             ~stm: stats
+             ~stm*:return-stats
+             return x ; 
+           }
+        ]|    
+   where 
+   {| TranslateMultipleReturn:
+     <newname>"ovlist" => x 
+   ; <map(TranslateExp)>a* ; list-to-ov-list(|x) => return-stats 
+   ; rules(TranslateMultipleReturn : Return() -> stm |[ { ~stm*:return-stats  
+                                                        return x ;
+                                                      } ]| ) 
+   ; <map(var-to-declaration)>a0* => in-args
+   ; <translate-function-body>e1 => stats 
+   |}
+
+
+ TranslateFuncOct:
+   |[ function [ ps ] = f(a0*) e1 end ]| 
+     -> fun-def |[ 
+           ~type-spec:"" DEFUN_DLD (f, args, nargout,~id:"\"\"")
+           {
+             octave_value_list x ;
+             ~dec*:[<gather-declarations2(|[])>e1 | otherdecs]
+             ~stm: stats
+             ~stm: <args-to-return(|x)>ps ; 
+           }
+        ]|    
+   where 
+   {| oct-return-args :
+     <newname>"ovlist" => x
+   ; rules( return-var : _ -> Var(x) )
+   ; rules( oct-return-args : _ -> ps )
+   ; <map(var-to-declaration)>a0* => in-args
+   ; <add-indices ; map(\ (i,Var(y)) -> stm |[ y = args(~int:<dec>i ) ; ]| \)>a0* => otherdecs
+   ; <translate-function-body>e1 => stats
+   |}
+
+
+
+// return
+rules
+
+  /**
+   * It includes a return statement
+   * at the end of the sequence of statements
+   */
+  add-return-to-body(|return) =
+    Stats(at-end(![return]))
+
+

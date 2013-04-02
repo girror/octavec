@@ -1,0 +1,11 @@
+module Insn-extra
+signature 
+ constructors
+
+   SEQ   : IStmt * IStmt -> IStmt
+   SEQS  : List(IStmt) -> IStmt
+   EX    : IStmt -> IStmt
+   CALL  : Id * List(ILoc) -> IStmt
+   TOSTAT: IStmt -> IStmt
+   Cx	 : IStmt * ILoc * ILoc -> IStmt
+

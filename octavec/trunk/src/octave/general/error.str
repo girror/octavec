@@ -1,0 +1,50 @@
+module octave/general/error
+imports liblib
+
+/**
+ * Debug output
+ */
+strategies
+
+  ti-warning(|msg) =
+    log(|Warning(),msg)
+  ; debug-pp(|"   ")
+
+  ti-warning-not-supported(|msg) =
+    ti-warning(|<concat-strings>["Not yet supported -> ",msg])
+
+  ti-create-rule-debug(|n) =
+    ?(x,ts)
+  ; log(|Debug(),["*** RULE ***    : rules( ",n," : ",|[x]|," -> ",ts," )"])
+
+  ti-builtin-debug =
+    log(|Debug(),["                : ",<id>])
+
+  ti-error(|msg) =
+    err(|msg)
+  ; <exit>1
+
+  debug-pp(|prefix) = 
+    where(
+      xtc-temp-files(
+        write-to
+      ; xtc-transform(!"pp-aterm")
+      ; ?FILE(<read-text-file>)
+      ; <string-tokenize>(['\n'],<id>)
+      ; map(<concat-strings>[prefix,<id>] ; log(|Debug(),<id>))
+      ) 
+    )
+
+  xtc-find-no-log = silent(xtc-find)
+
+  silent(s) =
+    lower-verbose(s|<get-config>"--verbose")
+    
+  lower-verbose(s|n) =
+    where(
+      <get-config>"--verbose" => old
+    ; <set-config>("--verbose",<add>(old,n))
+    )
+  ; s
+  ; where( <set-config>("--verbose",old) )
+	

@@ -1,0 +1,63 @@
+module TC-MExpansion
+rules
+
+  //ro::  scalar * matrix -> matrix
+  TcMExp:
+  |[  e :: ts ro e1:: ts1 ]| ->
+     |[ ( e :: ts ro e1:: ts1)::matrix(bool,dim(sh*))]|
+  where  <is-relop>ro
+        ; <matrix-scalar>(ts1,ts)
+	; GetShape => sh*
+
+  //ro::  matrix * scalar -> matrix
+  TcMExp:
+  |[  e :: ts ro e1:: ts1 ]| ->
+     |[ ( e :: ts ro e1:: ts1)::matrix(bool,dim(sh*))]|
+  where  <is-relop>ro
+        ; <matrix-scalar>(ts,ts1) 
+	; GetShape => sh*
+
+  //bo::  scalar * matrix -> matrix
+  TcMExp:
+  |[ e :: ts bo e1:: ts1 ]| -> |[ ( e :: ts bo e1:: ts1)::ts2]|
+  where <not(?|[ / ]| + ?|[ ./ ]|)> bo 
+        ; <matrix-scalar>(ts1,ts) => ts2
+
+
+  //bo::  matrix * scalar -> matrix
+  TcMExp:
+  |[ e :: ts bo e1:: ts1 ]| -> |[ ( e :: ts bo e1:: ts1):: ts2]|
+  where <not(?|[ / ]| + ?|[ ./ ]|)>bo
+        ; <matrix-scalar>(ts,ts1) => ts2
+
+  //  /::matrix * scalar -> matrix
+  TcMExp:
+  |[ e :: ts bo e1:: ts1 ]| ->
+	 |[ ( e :: ts bo e1:: ts1)::matrix(t2,dim(sh*)) ]|
+  where <?|[ / ]| + ?|[ ./ ]|>bo
+        ; <matrix-scalar>(ts,ts1) => |[matrix(t,dim(sh*))]|
+        ; <try(?INT(); !FLOAT())>t => t2
+        
+  // /::   scalar * matrix -> matrix
+  TcMExp:
+  |[ e :: ts bo e1:: ts1 ]| ->
+	|[ ( e :: ts bo e1:: ts1)::matrix(t2,dim(sh*)) ]|
+  where	<?|[ / ]| + ?|[ ./ ]|>bo
+        ; <matrix-scalar>(ts1,ts) => |[matrix(t3,dim(sh*))]|
+        ; <try(?INT();!FLOAT())>t3 => t2
+
+ /* TcExp:
+  BinOp(Typed(NaN{INT},INT),op,Typed(y,mty)) ->
+	Typed(MExpansion(y, op'){MATRIX(t)}, MATRIX(t))
+  where <GetAType> mty => MATRIX(t);	
+	!PartialBOp(op, NaN{INT}){t} => op'*/
+
+
+
+  
+  matrix-scalar =
+  ?(ts,ts1)
+  ; <GetTypeShape>ts => |[ matrix(t,dim(sh*)) ]| 
+  ; <get-scalar> ts1 
+  ; <get-wide-scalar>(t,<id>) => t2 
+  ; !|[matrix(t2,dim(sh*))]| 

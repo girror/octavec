@@ -1,0 +1,126 @@
+module common
+signature
+  constructors
+    FunctionDeclaration : Id * List(Id) * List(VarTyped) -> FunctionDeclaration
+    Decls               : List(FunctionDeclaration) -> UserDecls
+    CellTyped           : List(IntConst) * TypeShape -> CellTyped
+    VarTyped            : Id * TypeShape -> VarTyped
+    RANGE               : Type * Exp -> TypeShape
+    UNIVERSAL           : TypeShape
+    RECORD              : List(VarTyped) -> TypeShape
+    CELL                : List(CellTyped) -> TypeShape
+    FCNHANDLE           : TypeShape
+    ONE_MANY            : TypeShape -> TypeShape
+    MANY                : TypeShape -> TypeShape
+    RANGE               : Exp -> TypeShape
+    RANGE               : TypeShape
+    MATRIX              : Type * ListPlusOfExp_0 -> TypeShape
+    MATRIX              : Type -> TypeShape
+    STRING              : Exp -> TypeShape
+    STRING              : TypeShape
+    SCALAR              : Type -> TypeShape
+    UNION_TYPES         : List(TypeShape) -> TypeShape
+    STREAMOFF           : Type
+    NUMERIC             : Type
+    FCNHANDLE           : Type
+    CHAR                : Type
+    COMPLEX             : Type
+    FLOAT               : Type
+    INT                 : Type
+    BOOL                : Type
+    ANY_TYPE            : Type
+    FunctionSig         : Id * List(TypeShape) * List(TypeShape) -> FunctionType
+    MappingFuncs        : List(FunctionType) -> MappingFuncs
+    LibFuncs            : List(FunctionType) -> FunctionSignatures
+    Variables           : List(VarTyped) -> Variables
+    Constants           : List(VarTyped) -> Constants
+    ProgDecls           : List(Constants) * List(Variables) * List(FunctionSignatures) * List(MappingFuncs) * List(UserDecls) -> ProgDeclaration
+    Conc                : ListStarOfLValue_0 * ListPlusOfLValue_0 -> ListPlusOfLValue_0
+    Conc                : ListPlusOfLValue_0 * ListStarOfLValue_0 -> ListPlusOfLValue_0
+    Conc                : ListPlusOfLValue_0 * ListPlusOfLValue_0 -> ListPlusOfLValue_0
+    Cons                : LValue * ListStarOfLValue_0 -> ListPlusOfLValue_0
+    meta-var            : String -> ListPlusOfLValue_0
+    Conc                : ListStarOfExp_0 * ListPlusOfExp_0 -> ListPlusOfExp_0
+    Conc                : ListPlusOfExp_0 * ListStarOfExp_0 -> ListPlusOfExp_0
+    Conc                : ListPlusOfExp_0 * ListPlusOfExp_0 -> ListPlusOfExp_0
+    Cons                : Exp * ListStarOfExp_0 -> ListPlusOfExp_0
+    meta-var            : String -> ListPlusOfExp_0
+    Conc                : ListStarOfExp_1 * ListPlusOfExp_1 -> ListPlusOfExp_1
+    Conc                : ListPlusOfExp_1 * ListStarOfExp_1 -> ListPlusOfExp_1
+    Conc                : ListPlusOfExp_1 * ListPlusOfExp_1 -> ListPlusOfExp_1
+    Cons                : Exp * ListStarOfExp_1 -> ListPlusOfExp_1
+    meta-var            : String -> ListPlusOfExp_1
+    Default             : Exp -> Case
+    Case                : Exp * Exp -> Case
+                        : Var -> Init
+    Init                : Var * Exp -> Init
+                        : String -> DeclSort
+    meta-var            : String -> RealConst
+                        : String -> RealConst
+    meta-var            : String -> StrConst
+                        : String -> StrConst
+    meta-var            : String -> IntConst
+                        : String -> IntConst
+                        : ListPlusOfExp_0 -> Row
+    meta-var            : String -> LValue
+    CellIndex           : LValue * ListPlusOfExp_0 -> LValue
+    Subscript           : LValue * ListPlusOfExp_0 -> LValue
+    FieldVar            : LValue * Id -> LValue
+                        : Var -> LValue
+    Var                 : Id -> Var
+    Var                 : Id -> Exp
+    meta-var            : String -> Exp
+    AssignMulti         : ListPlusOfLValue_0 * AssignOperator * Exp -> Exp
+    Assign              : LValue * AssignOperator * Exp -> Exp
+    DoUntil             : Exp * Exp -> Exp
+    While               : Exp * Exp -> Exp
+    UnwindProtect       : Exp * Exp -> Exp
+    TryCatch            : Exp * Exp -> Exp    
+    Switch              : Exp * List(Case) -> Exp
+    IfThen              : Exp * Exp -> Exp
+    If                  : Exp * Exp * Exp -> Exp
+    Function            : Exp * Id * ListStarOfExp_0 * Exp -> Exp
+    Function            : ListPlusOfExp_0 * Id * ListStarOfExp_0 * Exp -> Exp
+    ComplexFor          : ListPlusOfExp_0 * Exp * Exp -> Exp
+    For                 : Exp * Exp * Exp -> Exp
+    Decl                : DeclSort * List(Init) -> Exp
+    Stats               : ListStarOfExp_1 -> Exp
+    Return              : Exp
+    Continue            : Exp
+    Break               : Exp
+                        : String -> Exp
+    Call                : Var * ListStarOfExp_0 -> Exp
+    FcnHandle           : Id -> Exp
+    AnonFcnHandle       : List(Exp) * Id * Exp -> Exp
+    False               : Exp
+    True                : Exp
+    Colon               : Exp
+    String              : StrConst -> Exp
+    Float               : RealConst -> Exp
+    Int                 : IntConst -> Exp
+    NilExp              : Exp
+    Cell                : List(Row) -> Exp
+    Matrix              : List(Row) -> Exp
+                        : LValue -> Exp
+    Range               : Exp * Exp * Exp -> Exp
+    PostfixExp          : Exp * PostfixOp -> Exp
+    PrefixExp           : PrefixOp * Exp -> Exp
+    BinOp               : Exp * BinOp * Exp -> Exp
+    meta-var            : String -> Id
+                        : String -> Id
+    meta-var            : String -> PostfixOp
+                        : String -> PostfixOp
+    meta-var            : String -> PrefixOp
+                        : String -> PrefixOp
+                        : String -> AssignOperator
+    meta-var            : String -> BinOp
+                        : String -> BinOp
+signature
+  constructors
+    Some : a -> Option(a)
+    None : Option(a)
+signature
+  constructors
+    Cons : a * List(a) -> List(a)
+    Nil  : List(a)
+    Conc : List(a) * List(a) -> List(a)

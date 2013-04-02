@@ -1,0 +1,48 @@
+module TC-Statements
+
+rules
+/*
+  TcStat:
+  |[ break ]| -> |[ break :: unit ]|
+
+  TcStat:
+  |[ continue ]| -> |[ continue :: unit ]|
+
+  TcStat: 
+  |[ return ]| -> |[ return :: unit ]|
+*/
+
+  TcWhile(tc):
+  |[ while e do e1 end ]| -> |[ while e do e3 end ]|
+  where <tc> e1  => |[ e3 ]| 
+
+  TcFor(tc):
+  |[ for x = (e :: ts) do e1 end ]| ->
+	 |[ for x::t = (e::ts) do e3 end ]|
+  where <GetAType> ts => t
+	; <GetShape> ts => [Int("1"),c] 
+	; <create-type-rule> (|[ x ]|,SCALAR(t))
+	; <tc> e1  => |[ e3 ]| 
+ 
+
+  TcFor(tc):
+  |[ for x = (e :: ts) do e1 end ]| ->
+	 |[ for x::matrix(t,dim(sh*)) = (e::ts) do e3 end ]|
+  where <GetAType> ts => t
+	; <GetShape> ts => [r,c]
+        ; not([Int("1"),id])
+	; ![r,Int("1")] => sh*
+	; <create-type-rule> (|[ x ]|,|[matrix(t,dim(sh*))]|)
+	; <tc> e1  => |[ e3 ]| 
+
+
+ /* TcFor(tc):
+  For(Var(x), vals, b) -> For(Var(x){tx},vs{ts},b')
+  where <tc> e => 
+	<GetVal <+ !vs{ts} > vs{ts} => Matrix(rs){tr};
+	<length> rs => nrows;
+	(<eq>(1,nrows); !tx <+ !tr) => tiv;
+	<create-type-rule> (Var(x),tiv);
+	<tc> b  => b' */
+
+ 

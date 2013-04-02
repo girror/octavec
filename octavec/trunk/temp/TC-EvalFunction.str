@@ -1,0 +1,63 @@
+module TC-EvalFunction
+
+rules
+
+  LibEval(tc):
+  |[ size(e::ts) ]| -> <tc>Matrix([ds]) 
+   where <GetShape>ts =>ds; not(oncetd(?SKIP()))
+
+  LibEval(tc):
+  |[ iscell(e::ts) ]| -> |[ false::bool ]|
+  where <GetTypeShape>ts => |[matrix(t,dim(sh*))]|
+
+  LibEval(tc):
+  |[ ischar(e::ts) ]| -> |[ true::bool ]|
+  where <GetAType>ts => |[ char ]|
+ 
+  LibEval(tc):
+  |[ isbool(e::ts) ]| -> |[ true::bool ]|
+  where <get-scalar>ts => |[ bool]|
+  
+  LibEval(tc):
+  |[ iscomplex(e::ts) ]| -> |[ true::bool ]|
+  where <get-scalar>ts => |[ complex ]|
+
+  LibEval(tc):
+  |[ isreal(e::ts) ]| -> |[ true::bool ]|
+  where <get-scalar>ts; is-scalar
+	
+
+  LibEval(tc):
+  |[ isnumeric(e::ts) ]| -> |[ true::bool ]|
+  where <GetAType>ts; is-scalar
+
+  LibEval(tc):
+  |[ ismatrix(e::ts) ]| -> |[ true::bool ]|
+  where !ts ; not(MATRIX(id,[])); GetAType; is-scalar
+
+
+
+  // Eval Expressions
+  EvalExpr(tc) :
+    |[ !(true :: bool) ]| -> |[ false :: bool ]|
+
+  EvalExpr(tc) :
+    |[ !(false :: bool) ]| -> |[ true :: bool ]|
+
+  EvalExpr(tc) :
+   |[ e != e ]| -> |[false::bool]|
+
+  EvalExpr(tc) :
+   |[ e == e ]| -> |[true::bool]|
+
+  EvalExpr(tc) :
+   |[ true && e ]| -> |[ e ]|
+
+  EvalExpr(tc) :
+   |[ e && true ]| -> |[ e ]|
+
+  EvalExpr(tc) :
+   |[ e || true ]| -> |[ true::bool ]|
+ 
+  EvalExpr(tc) :
+   |[ true || e ]| -> |[ true::bool ]|

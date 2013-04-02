@@ -1,0 +1,25 @@
+module octave/interpreter/common
+imports liblib 
+
+strategies
+
+  initialize-octave-stuff = 
+    prim("initialize_octave_stuff")
+
+  parse-octave-function   =
+   ?fn1
+  ; try(remove-extension)
+  ; ?fn
+  ; log(|Debug(),<concat-strings>["parsing ",fn])
+  ; prim("parse_octave",fn) ; not([])
+
+  is-function             = ?fn ; prim("is_function",fn) ; not([])
+  is-user-function        = ?fn ; prim("is_user_function",fn) ; not([])
+  is-builtin-function     = ?fn ; prim("is_builtin_function",fn) ; not([]) //; not(is-mapping-function)
+  is-dld-function         = ?fn ; prim("is_dld_function",fn) ; not([])
+  is-mapping-function     = ?fn ; prim("is_mapping_function",fn) ; not([])
+  is-command              = ?fn ; prim("is_command",fn) ; not([])
+  //is-builtin-constant     = ?fn ; prim("is_builtin_constant",fn) ; not([])
+  is-builtin-constant =  ?"pi" + ?"Inf" + ?"inf" + ?"NaN" +  ?"nan" +  ?"NA" + ?"eps"
+
+

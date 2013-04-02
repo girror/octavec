@@ -1,0 +1,21 @@
+module Octave-SetTypes
+imports Octave Octave-Joint Octave-TypeIncludes
+	Octave-Typed  liblib
+
+signature
+ constructors
+  Typed: Exp * TypeShape -> Exp
+  VarTyped: Exp * Exp -> Exp
+  UNIVERSAL : Term
+strategies
+
+ /**
+  *  This trafo is to expose type information to
+  *  from the annotations to be able to pretty print them
+  **/
+
+
+ io-Octave-SetTypes =
+   io-wrap(topdown(try(\ e{type} -> Typed(type,<rm-annotations>e) \))) 
+
+      
